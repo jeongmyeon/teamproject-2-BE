@@ -8,19 +8,29 @@
 ## 목차
 
 1. [고도화 개요](#1-고도화-개요)
-2. [인프라 고도화](#2-인프라-고도화)
-3. [성능 및 확장성 개선](#3-성능-및-확장성-개선)
-4. [데이터 정합성 및 안정성](#4-데이터-정합성-및-안정성)
-5. [품질 관리 및 테스트](#5-품질-관리-및-테스트)
-6. [모니터링 및 로깅](#6-모니터링-및-로깅)
-7. [사용자 경험 개선](#7-사용자-경험-개선)
-8. [AI 기능 확장](#8-ai-기능-확장)
-9. [도메인별 적용 계획](#9-도메인별-적용-계획)
-10. [단계별 로드맵](#10-단계별-로드맵)
+2. [Kubernetes 기반 배포 및 운영 고도화](#2-kubernetes-기반-배포-및-운영-고도화)
+3. [서비스별 자원 할당 관리](#3-서비스별-자원-할당-관리)
+4. [정산 배치 병렬 처리 고도화](#4-정산-배치-병렬-처리-고도화)
+5. [Redis 및 TTL 적용](#5-redis-및-ttl-적용)
+6. [Redis 장애 주입 테스트](#6-redis-장애-주입-테스트)
+7. [Outbox Pattern 적용](#7-outbox-pattern-적용)
+8. [Kafka DLQ 적용](#8-kafka-dlq-적용)
+9. [멱등성 처리](#9-멱등성-처리)
+10. [테스트 케이스 작성](#10-테스트-케이스-작성)
+11. [스트레스 테스트 및 JMeter](#11-스트레스-테스트-및-jmeter)
+12. [SonarQube를 통한 코드 품질 관리](#12-sonarqube를-통한-코드-품질-관리)
+13. [모니터링 도구 적용](#13-모니터링-도구-적용)
+14. [ELK 로그 고도화 및 분산 추적](#14-elk-로그-고도화-및-분산-추적)
+15. [BFF 적용](#15-bff-적용)
+16. [RAG 기반 AI 기능 확장](#16-rag-기반-ai-기능-확장)
+17. [도메인별 적용 계획](#17-도메인별-적용-계획)
+18. [단계별 로드맵](#18-단계별-로드맵)
 
 ---
 
 ## 1. 고도화 개요
+
+Biddy는 중고거래, 경매, 주문, 결제, 정산 기능이 분리된 MSA 기반 서비스이므로 단순 기능 구현뿐 아니라 성능, 안정성, 데이터 정합성, 운영 관리 측면의 고도화가 필요합니다.
 
 ### 1.1 현재 상태
 
@@ -45,13 +55,13 @@ Biddy는 Member, Product, Auction, Order, Payment 서비스로 분리된 MSA 구
 
 ---
 
-## 2. 인프라 고도화
+## 2. Kubernetes 기반 배포 및 운영 고도화
 
-### 2.1 Kubernetes 기반 배포 및 운영
-
-#### 개념 설명
+### 2.1 개념 설명
 
 **Kubernetes(K8s)** 는 컨테이너화된 애플리케이션을 자동으로 배포, 스케일링, 관리하는 오픈소스 플랫폼입니다.
+
+기존 Docker Compose 기반 실행 구조를 Kubernetes 기반 배포 구조로 전환하여 각 서비스를 독립적으로 배포하고 관리할 수 있도록 합니다. Member, Product, Order, Auction, Payment, Gateway 등 각 서비스를 Deployment와 Service로 분리하고, 서비스별 Pod를 Kubernetes에서 관리하도록 구성합니다.
 
 **핵심 개념:**
 
@@ -97,7 +107,7 @@ Biddy는 Member, Product, Auction, Order, Payment 서비스로 분리된 MSA 구
 | **ConfigMap** | 설정 관리 | DB URL, Kafka 주소 등 환경 설정 |
 | **Secret** | 민감 정보 관리 | JWT Secret, DB 비밀번호 |
 
-#### Docker Compose vs Kubernetes 비교
+### 2.2 Docker Compose vs Kubernetes 비교
 
 ```
 [Docker Compose - 현재]
@@ -113,7 +123,9 @@ kubectl apply -f k8s/
 → 장애 복구: Pod 죽으면 자동 재시작
 ```
 
-#### Biddy 적용 계획
+### 2.3 Biddy 적용 계획
+
+Kubernetes를 적용하면 서비스별 독립 배포, 장애 발생 시 자동 복구, 레플리카 수 조절, 로드밸런싱, 자원 할당 관리가 가능합니다. 특히 Product와 Auction 서비스처럼 트래픽이 몰릴 수 있는 서비스는 레플리카 수를 늘려 수평 확장하고, Kubernetes Service가 요청을 여러 Pod로 정상 분산하는지 확인합니다.
 
 **Phase 1: Deployment 및 Service 작성**
 
@@ -168,7 +180,9 @@ spec:
   type: ClusterIP  # 내부 통신
 ```
 
-**Phase 2: 로드밸런싱 검증**
+### 2.4 로드밸런싱 검증
+
+로드밸런싱 검증은 Product 또는 Auction 서비스의 replica 수를 1개에서 3개로 늘린 뒤 반복 요청을 보내고, 각 요청이 서로 다른 Pod로 분산되는지 로그를 통해 확인하는 방식으로 진행합니다.
 
 ```bash
 # 1. Product 서비스 replica 3개로 증가
@@ -197,7 +211,7 @@ kubectl logs -f product-service-5f6b7c8d9-ghi56
 # 예상 결과: 10개 요청이 3개 Pod에 고르게 분산 (약 3-4개씩)
 ```
 
-**Phase 3: 자동 복구 검증**
+이후 replica 수를 다시 줄여도 서비스가 정상 유지되는지 확인합니다. 또한 특정 Pod를 삭제했을 때 ReplicaSet이 새로운 Pod를 자동 생성하여 서비스가 유지되는지도 검증합니다.
 
 ```bash
 # 1. 특정 Pod 강제 삭제
@@ -216,11 +230,13 @@ kubectl get pods -l app=product -w
 
 ---
 
-### 2.2 서비스별 자원 할당 관리
+## 3. 서비스별 자원 할당 관리
 
-#### 개념 설명
+### 3.1 개념 설명
 
 **Kubernetes Resources (requests/limits)**
+
+Kubernetes yml에 각 서비스의 CPU와 메모리 requests/limits를 명시하여 서비스별 부하 특성에 맞게 자원을 할당합니다.
 
 | 항목 | 설명 |
 |------|------|
@@ -244,7 +260,9 @@ resources:
 3. CPU limit 초과 시: Throttling (느려짐)
 4. Memory limit 초과 시: OOM Kill (Pod 재시작)
 
-#### Biddy 서비스별 자원 할당 전략
+### 3.2 Biddy 서비스별 자원 할당 전략
+
+일반적인 인증, 상품 조회 서비스와 달리 Auction 서비스는 입찰 요청이 몰릴 수 있고, Payment 서비스는 정산 배치 작업을 포함하므로 상대적으로 더 많은 자원을 할당합니다.
 
 ```yaml
 # 1. Member Service (인증 - 가벼움)
@@ -296,6 +314,8 @@ resources:
     memory: "1Gi"
 ```
 
+예를 들어 Payment 서비스에는 정산 배치 처리를 고려하여 CPU와 메모리 limit을 높게 설정하고, thread pool size도 환경변수로 관리합니다. 이를 통해 코드 수정 없이 Kubernetes yml 설정 변경만으로 배치 처리 성능을 조정할 수 있습니다.
+
 **자원 할당 튜닝 지표:**
 
 | 서비스 | 모니터링 지표 | 임계값 | 조치 |
@@ -304,19 +324,14 @@ resources:
 | Auction | 메모리 사용률 | >85% | limit 증가 |
 | Payment | 배치 처리 시간 | >30분 | thread pool 증가 |
 
----
+### 3.3 Horizontal Pod Autoscaler (HPA)
 
-### 2.3 Horizontal Pod Autoscaler (HPA)
-
-#### 개념 설명
-
-HPA는 CPU/메모리 사용률을 모니터링하여 **자동으로 replica 수를 조절**하는 기능입니다.
+**개념:** HPA는 CPU/메모리 사용률을 모니터링하여 자동으로 replica 수를 조절하는 기능입니다.
 
 ```
 [HPA 동작 원리]
 
 현재 상태: Product Service replica=2, CPU 사용률 평균 85%
-
 HPA 설정: CPU > 70% 시 스케일 아웃
 
 1분 후: HPA가 replica를 2 → 3으로 증가
@@ -325,7 +340,7 @@ HPA 설정: CPU > 70% 시 스케일 아웃
 트래픽 감소 후: HPA가 replica를 3 → 2로 감소 (cooldown 5분)
 ```
 
-#### Biddy 적용
+**Biddy 적용:**
 
 ```yaml
 apiVersion: autoscaling/v2
@@ -360,230 +375,11 @@ spec:
 
 ---
 
-## 3. 성능 및 확장성 개선
+## 4. 정산 배치 병렬 처리 고도화
 
-### 3.1 Redis 및 TTL 적용
+### 4.1 개념 설명
 
-#### 개념 설명
-
-**Redis** 는 In-Memory Key-Value 저장소로, 디스크 기반 DB보다 **100~1000배 빠른 조회 성능**을 제공합니다.
-
-**TTL (Time To Live)** 은 데이터의 자동 만료 시간을 설정하는 기능입니다.
-
-```
-[Redis 없이 - 기존]
-상품 상세 조회 → PostgreSQL 조회 (50ms)
-
-[Redis 캐싱 - 개선]
-1차 조회 → Redis 조회 (1ms) → 캐시 히트
-2차 조회 → Redis 조회 (1ms) → 캐시 히트
-...
-TTL 만료 → Redis에서 삭제
-다음 조회 → Redis 미스 → PostgreSQL 조회 → Redis에 저장
-```
-
-#### Redis 사용 패턴
-
-| 패턴 | 설명 | Biddy 활용 |
-|------|------|-----------|
-| **Cache-Aside** | 읽기 전에 캐시 확인, 미스 시 DB 조회 후 캐시 저장 | 상품 상세, 회원 프로필 |
-| **Write-Through** | 쓰기 시 DB + 캐시 동시 저장 | 경매 최고가 갱신 |
-| **Write-Behind** | 쓰기 시 캐시만 저장, 비동기로 DB 저장 | 조회수, 인기 검색어 |
-
-#### Biddy 적용 시나리오
-
-**1. 상품 상세 캐시 (Cache-Aside)**
-
-```java
-@Service
-public class ProductQueryService {
-
-    @Autowired
-    private StringRedisTemplate redisTemplate;
-
-    @Autowired
-    private ProductRepository productRepository;
-
-    public ProductDetailResponse getProductDetail(UUID productId) {
-        String cacheKey = "product:detail:" + productId;
-
-        // 1. Redis 조회
-        String cached = redisTemplate.opsForValue().get(cacheKey);
-        if (cached != null) {
-            log.info("Cache HIT for product {}", productId);
-            return deserialize(cached);
-        }
-
-        // 2. Cache MISS → DB 조회
-        log.info("Cache MISS for product {}", productId);
-        Product product = productRepository.findById(productId)
-            .orElseThrow(() -> new ProductNotFoundException(productId));
-
-        ProductDetailResponse response = ProductDetailResponse.from(product);
-
-        // 3. Redis에 저장 (TTL 1시간)
-        redisTemplate.opsForValue().set(
-            cacheKey,
-            serialize(response),
-            Duration.ofHours(1)
-        );
-
-        return response;
-    }
-
-    // 상품 수정 시 캐시 무효화
-    @CacheEvict(value = "product:detail", key = "#productId")
-    public void updateProduct(UUID productId, ProductUpdateRequest request) {
-        // 업데이트 로직
-    }
-}
-```
-
-**2. 결제 대기 상태 (TTL 10분)**
-
-```java
-public class PaymentWaitingService {
-
-    public void createPendingPayment(UUID orderId, BigDecimal amount) {
-        String key = "payment:pending:" + orderId;
-
-        // TTL 10분으로 저장
-        redisTemplate.opsForValue().set(
-            key,
-            amount.toString(),
-            Duration.ofMinutes(10)
-        );
-    }
-
-    @Scheduled(fixedRate = 60000) // 1분마다
-    public void checkExpiredPayments() {
-        // TTL 만료된 주문은 자동 취소
-        // Redis Keyspace Notification 활용
-    }
-}
-```
-
-**3. 로그아웃 토큰 블랙리스트 (TTL = 토큰 만료 시간)**
-
-```java
-public class JwtBlacklistService {
-
-    public void logout(String token) {
-        long expirationMs = jwtTokenProvider.getExpiration(token);
-        Duration ttl = Duration.ofMillis(expirationMs);
-
-        // 토큰 만료 시간까지 블랙리스트에 저장
-        redisTemplate.opsForValue().set(
-            "jwt:blacklist:" + token,
-            "revoked",
-            ttl
-        );
-    }
-
-    public boolean isBlacklisted(String token) {
-        return redisTemplate.hasKey("jwt:blacklist:" + token);
-    }
-}
-```
-
-**4. 경매 현재 최고가 (Write-Through)**
-
-```java
-public class AuctionBidService {
-
-    public void placeBid(String auctionId, BigDecimal amount, Long bidderId) {
-        // 1. DB 저장
-        Auction auction = auctionRepository.findById(auctionId);
-        auction.updateCurrentBid(amount, bidderId);
-        auctionRepository.save(auction);
-
-        // 2. Redis 동시 저장 (TTL 경매 종료 시간까지)
-        String key = "auction:current-bid:" + auctionId;
-        redisTemplate.opsForValue().set(
-            key,
-            amount.toString(),
-            Duration.between(LocalDateTime.now(), auction.getEndsAt())
-        );
-
-        // 3. WebSocket으로 실시간 브로드캐스트
-        webSocketService.broadcast(auctionId, BidUpdate.of(amount, bidderId));
-    }
-
-    public BigDecimal getCurrentBid(String auctionId) {
-        String key = "auction:current-bid:" + auctionId;
-        String cached = redisTemplate.opsForValue().get(key);
-
-        if (cached != null) {
-            return new BigDecimal(cached);
-        }
-
-        // Cache Miss → DB 조회
-        Auction auction = auctionRepository.findById(auctionId);
-        return auction.getCurrentBid();
-    }
-}
-```
-
-#### Redis 장애 대응
-
-**문제:** Redis 서버 다운 시 전체 서비스 중단?
-
-**해법:** Fallback 전략
-
-```java
-@Service
-public class ResilientCacheService {
-
-    public ProductDetailResponse getProductDetail(UUID productId) {
-        try {
-            // Redis 시도
-            return getFromCache(productId);
-        } catch (RedisConnectionException e) {
-            log.warn("Redis unavailable, fallback to DB", e);
-            // Fallback: DB 직접 조회
-            return getFromDatabase(productId);
-        }
-    }
-}
-```
-
-**검증 계획:**
-
-```bash
-# 1. Redis 서버 중단
-docker stop redis
-
-# 2. 상품 조회 요청 (DB fallback 동작 확인)
-curl http://localhost:8082/api/products/123
-
-# 예상 로그:
-# WARN - Redis unavailable, fallback to DB
-# 응답 시간: 1ms → 50ms (느리지만 정상 동작)
-
-# 3. Redis 재시작
-docker start redis
-
-# 4. 상품 조회 요청 (Redis 재연결 확인)
-curl http://localhost:8082/api/products/123
-
-# 예상 로그:
-# INFO - Cache MISS for product 123
-# INFO - Stored in Redis with TTL 1h
-# 응답 시간: 50ms (첫 요청)
-
-# 5. 두 번째 조회
-curl http://localhost:8082/api/products/123
-
-# 예상 로그:
-# INFO - Cache HIT for product 123
-# 응답 시간: 1ms (캐싱 복구 완료)
-```
-
----
-
-### 3.2 정산 배치 병렬 처리 고도화
-
-#### 개념 설명
+정산 대상 데이터가 증가하면 단일 스레드 기반 순차 처리만으로는 하루 안에 모든 정산을 완료하기 어려울 수 있습니다. 예를 들어 정산 대상이 10,000건 이상일 경우, 1개 스레드로 모든 데이터를 순차 처리하면 처리 시간이 과도하게 길어질 수 있습니다.
 
 **배치 처리 (Batch Processing)** 는 대량의 데이터를 일괄 처리하는 작업입니다. Biddy에서는 판매자별 정산을 매월 1일 02:00에 일괄 처리합니다.
 
@@ -608,7 +404,7 @@ curl http://localhost:8082/api/products/123
 → 총 333초 (약 5.5분) - 3배 빠름
 ```
 
-#### Java Thread Pool 개념
+### 4.2 Java Thread Pool 개념
 
 ```java
 // Thread Pool 생성
@@ -630,9 +426,12 @@ executor.awaitTermination(1, TimeUnit.HOURS);
 
 | 작업 유형 | 권장 크기 | 이유 |
 |----------|----------|------|
-| CPU 집약적 (계산) | CPU 코어 수 | 1.5 ~ 2 |\n| I/O 집약적 (DB, API) | CPU 코어 수 * 2 ~ 4 | I/O 대기 시간 활용 |
+| CPU 집약적 (계산) | CPU 코어 수 1.5 ~ 2 | CPU 최대 활용 |
+| I/O 집약적 (DB, API) | CPU 코어 수 * 2 ~ 4 | I/O 대기 시간 활용 |
 
-#### Biddy 적용
+### 4.3 Biddy 적용
+
+이를 개선하기 위해 정산 배치 작업에 thread pool 기반 병렬 처리를 적용합니다. 정산 대상 10,000건을 기준으로 thread pool size를 1개, 2개, 3개로 변경하면서 전체 처리 시간, 초당 처리 건수, CPU 사용량, 메모리 사용량, DB 커넥션 사용량, 실패 건수를 비교합니다.
 
 **설정 외부화:**
 
@@ -737,7 +536,9 @@ public class SettlementBatchService {
 }
 ```
 
-#### 성능 비교 테스트
+### 4.4 성능 비교 테스트
+
+이를 통해 무조건 스레드 수를 늘리는 것이 아니라, 시스템 자원과 DB 부하를 고려한 적정 스레드 풀 크기를 결정합니다.
 
 **테스트 시나리오:**
 
@@ -764,11 +565,250 @@ public class SettlementBatchService {
 
 ---
 
-## 4. 데이터 정합성 및 안정성
+## 5. Redis 및 TTL 적용
 
-### 4.1 Outbox Pattern
+### 5.1 개념 설명
 
-#### 개념 설명
+**Redis** 는 In-Memory Key-Value 저장소로, 디스크 기반 DB보다 **100~1000배 빠른 조회 성능**을 제공합니다.
+
+**TTL (Time To Live)** 은 데이터의 자동 만료 시간을 설정하는 기능입니다.
+
+```
+[Redis 없이 - 기존]
+상품 상세 조회 → PostgreSQL 조회 (50ms)
+
+[Redis 캐싱 - 개선]
+1차 조회 → Redis 조회 (1ms) → 캐시 히트
+2차 조회 → Redis 조회 (1ms) → 캐시 히트
+...
+TTL 만료 → Redis에서 삭제
+다음 조회 → Redis 미스 → PostgreSQL 조회 → Redis에 저장
+```
+
+### 5.2 Redis 사용 패턴
+
+| 패턴 | 설명 | Biddy 활용 |
+|------|------|-----------|
+| **Cache-Aside** | 읽기 전에 캐시 확인, 미스 시 DB 조회 후 캐시 저장 | 상품 상세, 회원 프로필 |
+| **Write-Through** | 쓰기 시 DB + 캐시 동시 저장 | 경매 최고가 갱신 |
+| **Write-Behind** | 쓰기 시 캐시만 저장, 비동기로 DB 저장 | 조회수, 인기 검색어 |
+
+### 5.3 Biddy 적용 시나리오
+
+Redis는 빠른 조회와 임시 상태 관리를 위해 사용합니다. Biddy에서는 결제 대기 상태, 로그아웃 토큰 블랙리스트, 상품 상세 캐시, 경매 현재 최고가, 중복 요청 방지 등에 Redis를 적용할 수 있습니다.
+
+**1. 상품 상세 캐시 (Cache-Aside)**
+
+```java
+@Service
+public class ProductQueryService {
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
+
+    @Autowired
+    private ProductRepository productRepository;
+
+    public ProductDetailResponse getProductDetail(UUID productId) {
+        String cacheKey = "product:detail:" + productId;
+
+        // 1. Redis 조회
+        String cached = redisTemplate.opsForValue().get(cacheKey);
+        if (cached != null) {
+            log.info("Cache HIT for product {}", productId);
+            return deserialize(cached);
+        }
+
+        // 2. Cache MISS → DB 조회
+        log.info("Cache MISS for product {}", productId);
+        Product product = productRepository.findById(productId)
+            .orElseThrow(() -> new ProductNotFoundException(productId));
+
+        ProductDetailResponse response = ProductDetailResponse.from(product);
+
+        // 3. Redis에 저장 (TTL 1시간)
+        redisTemplate.opsForValue().set(
+            cacheKey,
+            serialize(response),
+            Duration.ofHours(1)
+        );
+
+        return response;
+    }
+
+    // 상품 수정 시 캐시 무효화
+    @CacheEvict(value = "product:detail", key = "#productId")
+    public void updateProduct(UUID productId, ProductUpdateRequest request) {
+        // 업데이트 로직
+    }
+}
+```
+
+**2. 결제 대기 상태 (TTL 10분)**
+
+예를 들어 결제 대기 주문은 10분 TTL을 설정하여 결제 시간이 지나면 만료되도록 합니다.
+
+```java
+public class PaymentWaitingService {
+
+    public void createPendingPayment(UUID orderId, BigDecimal amount) {
+        String key = "payment:pending:" + orderId;
+
+        // TTL 10분으로 저장
+        redisTemplate.opsForValue().set(
+            key,
+            amount.toString(),
+            Duration.ofMinutes(10)
+        );
+    }
+
+    @Scheduled(fixedRate = 60000) // 1분마다
+    public void checkExpiredPayments() {
+        // TTL 만료된 주문은 자동 취소
+        // Redis Keyspace Notification 활용
+    }
+}
+```
+
+**3. 로그아웃 토큰 블랙리스트 (TTL = 토큰 만료 시간)**
+
+로그아웃된 JWT는 기존 토큰 만료 시간까지 Redis 블랙리스트에 저장합니다.
+
+```java
+public class JwtBlacklistService {
+
+    public void logout(String token) {
+        long expirationMs = jwtTokenProvider.getExpiration(token);
+        Duration ttl = Duration.ofMillis(expirationMs);
+
+        // 토큰 만료 시간까지 블랙리스트에 저장
+        redisTemplate.opsForValue().set(
+            "jwt:blacklist:" + token,
+            "revoked",
+            ttl
+        );
+    }
+
+    public boolean isBlacklisted(String token) {
+        return redisTemplate.hasKey("jwt:blacklist:" + token);
+    }
+}
+```
+
+**4. 경매 현재 최고가 (Write-Through)**
+
+상품 상세 정보나 경매 현재 최고가도 짧은 TTL을 설정하여 조회 성능을 개선할 수 있습니다.
+
+```java
+public class AuctionBidService {
+
+    public void placeBid(String auctionId, BigDecimal amount, Long bidderId) {
+        // 1. DB 저장
+        Auction auction = auctionRepository.findById(auctionId);
+        auction.updateCurrentBid(amount, bidderId);
+        auctionRepository.save(auction);
+
+        // 2. Redis 동시 저장 (TTL 경매 종료 시간까지)
+        String key = "auction:current-bid:" + auctionId;
+        redisTemplate.opsForValue().set(
+            key,
+            amount.toString(),
+            Duration.between(LocalDateTime.now(), auction.getEndsAt())
+        );
+
+        // 3. WebSocket으로 실시간 브로드캐스트
+        webSocketService.broadcast(auctionId, BidUpdate.of(amount, bidderId));
+    }
+
+    public BigDecimal getCurrentBid(String auctionId) {
+        String key = "auction:current-bid:" + auctionId;
+        String cached = redisTemplate.opsForValue().get(key);
+
+        if (cached != null) {
+            return new BigDecimal(cached);
+        }
+
+        // Cache Miss → DB 조회
+        Auction auction = auctionRepository.findById(auctionId);
+        return auction.getCurrentBid();
+    }
+}
+```
+
+TTL을 활용하면 일정 시간이 지나면 자동으로 삭제되어야 하는 데이터를 효율적으로 관리할 수 있습니다.
+
+---
+
+## 6. Redis 장애 주입 테스트
+
+### 6.1 개념 설명
+
+Redis를 캐시나 임시 상태 저장소로 사용할 경우 Redis 장애가 전체 서비스 장애로 이어질 수 있습니다. 따라서 Redis 서버를 의도적으로 중단하고, 서비스가 완전히 중단되지 않고 DB fallback 또는 예외 처리를 통해 정상 흐름을 유지하는지 검증합니다.
+
+**문제:** Redis 서버 다운 시 전체 서비스 중단?
+
+**해법:** Fallback 전략
+
+```java
+@Service
+public class ResilientCacheService {
+
+    public ProductDetailResponse getProductDetail(UUID productId) {
+        try {
+            // Redis 시도
+            return getFromCache(productId);
+        } catch (RedisConnectionException e) {
+            log.warn("Redis unavailable, fallback to DB", e);
+            // Fallback: DB 직접 조회
+            return getFromDatabase(productId);
+        }
+    }
+}
+```
+
+### 6.2 검증 계획
+
+예를 들어 상품 상세 캐시 조회 중 Redis 장애가 발생하면 DB에서 직접 조회할 수 있어야 하며, Redis가 재시작된 후에는 서비스가 다시 정상 연결되어야 합니다. 또한 Redis TTL 기반 데이터가 유실되었을 때 결제 대기, 로그아웃 토큰, 경매 최고가 조회 흐름에 문제가 없는지도 확인합니다.
+
+```bash
+# 1. Redis 서버 중단
+docker stop redis
+
+# 2. 상품 조회 요청 (DB fallback 동작 확인)
+curl http://localhost:8082/api/products/123
+
+# 예상 로그:
+# WARN - Redis unavailable, fallback to DB
+# 응답 시간: 1ms → 50ms (느리지만 정상 동작)
+
+# 3. Redis 재시작
+docker start redis
+
+# 4. 상품 조회 요청 (Redis 재연결 확인)
+curl http://localhost:8082/api/products/123
+
+# 예상 로그:
+# INFO - Cache MISS for product 123
+# INFO - Stored in Redis with TTL 1h
+# 응답 시간: 50ms (첫 요청)
+
+# 5. 두 번째 조회
+curl http://localhost:8082/api/products/123
+
+# 예상 로그:
+# INFO - Cache HIT for product 123
+# 응답 시간: 1ms (캐싱 복구 완료)
+```
+
+---
+
+## 7. Outbox Pattern 적용
+
+### 7.1 개념 설명
+
+Biddy는 Kafka 이벤트를 활용하여 서비스 간 결합도를 낮추고 있습니다. 예를 들어 Product 서비스에서 경매 상품이 등록되면 Kafka 이벤트를 발행하고, Auction 서비스가 이를 수신하여 경매를 자동 생성합니다.
+
+하지만 상품 DB 저장은 성공했는데 Kafka 이벤트 발행이 실패하면, Product에는 경매 상품이 존재하지만 Auction에는 경매가 생성되지 않는 데이터 불일치가 발생할 수 있습니다.
 
 **문제:** 분산 트랜잭션 - DB 저장 성공, Kafka 발행 실패
 
@@ -784,6 +824,8 @@ public class SettlementBatchService {
 → 데이터 불일치!
 ```
 
+이를 방지하기 위해 Outbox Pattern을 적용할 수 있습니다.
+
 **Outbox Pattern 해법:**
 
 ```
@@ -798,12 +840,14 @@ public class SettlementBatchService {
 3. 발행 성공 시 outbox_events에서 삭제
 ```
 
+Outbox Pattern은 비즈니스 데이터 저장과 이벤트 데이터를 하나의 DB 트랜잭션으로 함께 저장한 뒤, 별도 Publisher가 outbox_events 테이블을 조회하여 Kafka로 발행하는 방식입니다. 이를 통해 DB 저장과 이벤트 발행 사이의 불일치 문제를 줄일 수 있습니다.
+
 **장점:**
 - DB 저장과 이벤트 발행의 원자성 보장
 - Kafka 장애 시에도 이벤트 유실 없음
 - 재시도 가능
 
-#### Biddy 적용
+### 7.2 Biddy 적용
 
 **1. Outbox Events 테이블**
 
@@ -909,7 +953,7 @@ public class OutboxEventPublisher {
 }
 ```
 
-**검증 시나리오:**
+### 7.3 검증 시나리오
 
 ```
 1. Kafka 서버 중단
@@ -925,9 +969,11 @@ public class OutboxEventPublisher {
 
 ---
 
-### 4.2 Kafka DLQ (Dead Letter Queue)
+## 8. Kafka DLQ 적용
 
-#### 개념 설명
+### 8.1 개념 설명
+
+Kafka 이벤트 처리 중 Consumer에서 예외가 발생하면 메시지가 정상 처리되지 못할 수 있습니다. 예를 들어 PaymentCompletedEvent가 발행되었지만 Order 서비스가 이를 처리하지 못하면 결제는 완료되었는데 주문 상태가 PAID로 바뀌지 않는 문제가 발생할 수 있습니다.
 
 **문제:** Consumer에서 이벤트 처리 실패 시 메시지 유실
 
@@ -946,6 +992,8 @@ public class OutboxEventPublisher {
 → 데이터 불일치!
 ```
 
+이를 대비하기 위해 Kafka DLQ를 적용합니다.
+
 **DLQ (Dead Letter Queue) 해법:**
 
 ```
@@ -961,7 +1009,9 @@ payment.completed Topic
   → 수동 확인 후 재처리
 ```
 
-#### Biddy 적용
+정상 처리에 실패한 이벤트는 별도의 Dead Letter Topic에 저장하고, 이후 실패 원인을 확인하거나 재처리할 수 있도록 합니다. 이를 통해 이벤트 유실을 방지하고, 장애 상황에서도 데이터 정합성을 복구할 수 있습니다.
+
+### 8.2 Biddy 적용
 
 **1. Kafka DLQ 설정**
 
@@ -1081,7 +1131,7 @@ public class DLQAdminController {
 }
 ```
 
-**검증 시나리오:**
+### 8.3 검증 시나리오
 
 ```
 1. Order Service의 DB 연결 일시적 차단
@@ -1102,9 +1152,11 @@ public class DLQAdminController {
 
 ---
 
-### 4.3 멱등성 처리
+## 9. 멱등성 처리
 
-#### 개념 설명
+### 9.1 개념 설명
+
+주문과 결제 요청은 중복 호출될 가능성이 있습니다. 사용자가 결제 버튼을 빠르게 두 번 누르거나, 네트워크 문제로 동일 요청이 재전송될 수 있기 때문입니다. 이 경우 동일 주문에 대해 결제가 중복 처리되면 안 됩니다.
 
 **멱등성 (Idempotency)** 은 동일한 요청을 여러 번 실행해도 결과가 같음을 보장하는 속성입니다.
 
@@ -1119,6 +1171,8 @@ public class DLQAdminController {
 → 사용자는 2배 청구됨!
 ```
 
+이를 방지하기 위해 orderId, paymentKey, idempotencyKey 등을 기준으로 동일 요청이 이미 처리되었는지 확인하고, 이미 처리된 요청은 다시 처리하지 않도록 멱등성을 보장합니다. 특히 결제, 주문 생성, 입찰 요청에는 멱등성 처리가 중요합니다.
+
 **해법:** Idempotency Key 패턴
 
 ```
@@ -1130,7 +1184,7 @@ public class DLQAdminController {
 4. 중복 요청 → 저장된 결과 반환 (재처리 안 함)
 ```
 
-#### Biddy 적용
+### 9.2 Biddy 적용
 
 **1. Idempotent Requests 테이블**
 
@@ -1255,7 +1309,7 @@ async function processPayment(orderId, amount) {
 }
 ```
 
-**검증 시나리오:**
+### 9.3 검증 시나리오
 
 ```
 1. 프론트에서 결제 요청 (idempotency-key: abc-123)
@@ -1275,11 +1329,15 @@ async function processPayment(orderId, amount) {
 
 ---
 
-## 5. 품질 관리 및 테스트
+## 10. 테스트 케이스 작성
 
-### 5.1 테스트 케이스 작성
+### 10.1 개념 설명
 
-#### 단위 테스트 (Unit Test)
+Biddy는 경매, 주문, 결제처럼 상태 변화가 많은 서비스이므로 주요 비즈니스 로직에 대한 테스트 케이스 작성이 필요합니다. Product 서비스에서는 상품 등록과 경매 상품 분기 처리를, Auction 서비스에서는 입찰 금액 검증과 최고가 갱신을, Order 서비스에서는 주문 생성과 상태 전이를, Payment 서비스에서는 결제 성공, 결제 실패, 정산 처리를 검증합니다.
+
+테스트 케이스를 통해 정상 흐름뿐 아니라 예외 상황에서도 서비스가 의도한 상태로 동작하는지 확인하고, 기능 변경 시 기존 로직이 깨지지 않도록 합니다.
+
+### 10.2 단위 테스트 (Unit Test)
 
 **목적:** 개별 메서드/클래스가 올바르게 동작하는지 검증
 
@@ -1372,7 +1430,7 @@ void 잔액_부족시_결제_실패() {
 }
 ```
 
-#### 통합 테스트 (Integration Test)
+### 10.3 통합 테스트 (Integration Test)
 
 **목적:** 여러 컴포넌트 (Controller, Service, Repository)가 함께 동작하는지 검증
 
@@ -1419,7 +1477,7 @@ class ProductIntegrationTest {
 }
 ```
 
-#### 이벤트 테스트 (Kafka)
+### 10.4 이벤트 테스트 (Kafka)
 
 ```java
 @SpringBootTest
@@ -1457,9 +1515,11 @@ class ProductEventTest {
 
 ---
 
-### 5.2 스트레스 테스트 (JMeter)
+## 11. 스트레스 테스트 및 JMeter
 
-#### 개념 설명
+### 11.1 개념 설명
+
+실제 서비스 환경에서는 상품 조회, 경매 입찰, 주문 생성, 결제 요청이 동시에 많이 발생할 수 있습니다. 따라서 스트레스 테스트를 통해 시스템이 어느 정도의 요청을 처리할 수 있는지 확인합니다.
 
 **JMeter** 는 서버에 대량의 요청을 보내어 성능을 측정하는 도구입니다.
 
@@ -1472,7 +1532,9 @@ class ProductEventTest {
 | **P95 응답 시간** | 95%의 요청이 이 시간 내에 완료 | <500ms |
 | **에러율** | 실패한 요청 비율 | <1% |
 
-#### JMeter 시나리오
+### 11.2 JMeter 시나리오
+
+JMeter를 활용하여 상품 목록 조회, 상품 상세 조회, 경매 입찰, 주문 생성, 결제 요청, 정산 배치에 대한 부하 테스트를 수행할 수 있습니다. 측정 지표는 TPS, 평균 응답 시간, P95 응답 시간, 에러율, CPU 사용량, 메모리 사용량, DB 커넥션 사용량으로 설정합니다. 이를 통해 병목 구간을 파악하고, Redis 캐싱, 스레드 풀 조정, Kubernetes 자원 할당의 효과를 비교할 수 있습니다.
 
 **1. 상품 목록 조회 (읽기 부하)**
 
@@ -1534,9 +1596,11 @@ Duration: 5분
 
 ---
 
-### 5.3 SonarQube 코드 품질 관리
+## 12. SonarQube를 통한 코드 품질 관리
 
-#### 개념 설명
+### 12.1 개념 설명
+
+SonarQube를 CI 과정에 연동하여 코드 품질을 관리합니다. Bugs, Code Smell, 중복 코드, 테스트 커버리지, Security Hotspot 등을 확인하여 기능 구현 이후에도 유지보수 가능한 코드 품질을 확보합니다.
 
 **SonarQube** 는 코드 정적 분석 도구로, 버그, 보안 취약점, 코드 스멜, 중복 코드를 자동 검출합니다.
 
@@ -1550,7 +1614,9 @@ Duration: 5분
 | **Test Coverage** | 테스트 커버리지 | >80% |
 | **Duplications** | 중복 코드 비율 | <3% |
 
-#### Biddy CI/CD 통합
+이를 통해 단순히 동작하는 코드를 만드는 것에서 나아가, 장기적으로 관리 가능한 백엔드 구조를 만드는 것을 목표로 합니다.
+
+### 12.2 Biddy CI/CD 통합
 
 ```yaml
 # .github/workflows/ci.yml
@@ -1604,11 +1670,11 @@ jobs:
 
 ---
 
-## 6. 모니터링 및 로깅
+## 13. 모니터링 도구 적용
 
-### 6.1 Prometheus + Grafana 모니터링
+### 13.1 개념 설명
 
-#### 개념 설명
+Kubernetes 환경에서는 각 서비스의 상태와 자원 사용량을 지속적으로 확인해야 합니다. 이를 위해 Spring Actuator, Prometheus, Grafana를 활용하여 서비스 상태, CPU 사용량, 메모리 사용량, API 응답 시간, 에러율, DB 커넥션 사용량, Redis 연결 상태, Kafka consumer lag 등을 모니터링합니다.
 
 **Prometheus** 는 시계열 데이터를 수집하는 모니터링 시스템입니다.
 **Grafana** 는 Prometheus 데이터를 시각화하는 대시보드 도구입니다.
@@ -1629,7 +1695,9 @@ jobs:
 └──────────────┘
 ```
 
-#### Biddy 적용
+모니터링 대시보드를 구성하면 장애 발생 시 어떤 서비스에서 문제가 발생했는지 빠르게 파악할 수 있고, 정산 배치나 경매 입찰처럼 부하가 큰 기능의 성능 변화도 확인할 수 있습니다.
+
+### 13.2 Biddy 적용
 
 **1. Spring Actuator 설정**
 
@@ -1778,9 +1846,11 @@ message: |
 
 ---
 
-### 6.2 ELK 로그 고도화 및 분산 추적
+## 14. ELK 로그 고도화 및 분산 추적
 
-#### 개념 설명
+### 14.1 개념 설명
+
+MSA 구조에서는 하나의 사용자 요청이 여러 서비스로 분산되기 때문에 장애 원인을 추적하기 어렵습니다. 예를 들어 결제 요청은 Gateway, Order, Payment, Kafka, 다시 Order 서비스로 이어질 수 있습니다.
 
 **ELK Stack:**
 - **Elasticsearch**: 로그 저장 및 검색 엔진
@@ -1807,7 +1877,9 @@ Span 1: Gateway (5ms)
 병목: Payment Service (120ms)
 ```
 
-#### Biddy 적용
+이를 해결하기 위해 ELK를 활용하여 서비스별 로그를 중앙에서 수집하고, orderId, paymentId, auctionId, memberId, traceId 기준으로 로그를 검색할 수 있도록 합니다. 또한 traceId 기반 분산 추적을 적용하면 하나의 요청이 여러 서비스와 Kafka 이벤트를 거쳐 어떻게 처리되었는지 전체 흐름을 확인할 수 있습니다.
+
+### 14.2 Biddy 적용
 
 **1. Logback 설정 (JSON 로그)**
 
@@ -1917,13 +1989,11 @@ Timeline:
 
 ---
 
-## 7. 사용자 경험 개선
+## 15. BFF 적용
 
-### 7.1 BFF (Backend For Frontend)
+### 15.1 개념 설명
 
-#### 개념 설명
-
-**BFF** 는 프론트엔드 화면 중심으로 데이터를 조합해주는 백엔드 계층입니다.
+**BFF** 는 프론트 화면 중심으로 데이터를 조합해주는 백엔드 계층입니다.
 
 **문제:**
 
@@ -1940,6 +2010,8 @@ Timeline:
 → 로딩 느림
 ```
 
+BFF는 프론트 화면에 필요한 여러 서비스의 데이터를 한 번에 조합해 내려주는 계층입니다. Biddy에서는 상품 상세 페이지, 마이페이지, 주문 상세 페이지, 경매 상세 페이지처럼 여러 도메인의 데이터가 동시에 필요한 화면에 적용할 수 있습니다.
+
 **BFF 해법:**
 
 ```
@@ -1952,7 +2024,9 @@ Timeline:
 프론트: 1번 API 호출로 완료 ✅
 ```
 
-#### Biddy 적용
+예를 들어 상품 상세 화면에서 Product, Member, Auction, Watchlist API를 각각 호출해야 한다면 프론트 요청이 많아집니다. BFF를 적용하면 프론트는 하나의 API만 호출하고, BFF가 내부적으로 여러 서비스를 호출하여 화면에 필요한 응답을 조합해줄 수 있습니다. 이를 통해 프론트의 API 호출 수를 줄이고 화면 중심의 응답 구조를 제공할 수 있습니다.
+
+### 15.2 Biddy 적용
 
 **BFF 서비스 구성:**
 
@@ -2047,11 +2121,11 @@ public class ProductDetailBFFController {
 
 ---
 
-## 8. AI 기능 확장
+## 16. RAG 기반 AI 기능 확장
 
-### 8.1 RAG (Retrieval-Augmented Generation)
+### 16.1 개념 설명
 
-#### 개념 설명
+Biddy에 AI 기능을 확장한다면 RAG 기반 기능을 적용할 수 있습니다. RAG는 서비스 내부의 상품 데이터, 경매 데이터, 정책 문서, FAQ를 검색한 뒤 그 결과를 기반으로 답변을 생성하는 방식입니다.
 
 **RAG** 는 LLM(Large Language Model)이 답변 생성 전에 **관련 문서를 먼저 검색**하여 답변의 정확도를 높이는 기법입니다.
 
@@ -2090,9 +2164,13 @@ public class ProductDetailBFFController {
     "검색된 문서 기반 답변"
 ```
 
-#### Biddy RAG 적용 시나리오
+### 16.2 Biddy RAG 적용 시나리오
+
+Biddy에서는 RAG 기반 FAQ 챗봇, 상품 추천 AI, 경매 입찰 도우미, 판매글 작성 도우미로 확장할 수 있습니다.
 
 **1. FAQ 챗봇**
+
+예를 들어 사용자가 "환불은 언제 되나요?"라고 질문하면 서비스 정책 문서를 검색하여 답변합니다.
 
 ```
 사용자: "경매 낙찰 후 배송은 언제 되나요?"
@@ -2109,6 +2187,8 @@ RAG 흐름:
 ```
 
 **2. 상품 추천 AI**
+
+"이 가격에 입찰해도 괜찮나요?"라고 질문하면 현재 입찰가, 유사 상품 가격, 과거 낙찰 데이터를 바탕으로 입찰 판단을 보조할 수 있습니다.
 
 ```
 사용자: "빈티지 시계 찾고 있어요"
@@ -2179,7 +2259,7 @@ RAG 흐름:
     즉시구매가: 900만원"
 ```
 
-#### 기술 스택
+### 16.3 기술 스택
 
 ```
 1. Vector DB: Pinecone, Chroma, Weaviate
@@ -2221,7 +2301,7 @@ print(result["source_documents"])
 
 ---
 
-## 9. 도메인별 적용 계획
+## 17. 도메인별 적용 계획
 
 ### Member 도메인
 
@@ -2275,7 +2355,7 @@ print(result["source_documents"])
 
 ---
 
-## 10. 단계별 로드맵
+## 18. 단계별 로드맵
 
 ### Phase 1: 인프라 기반 구축 (1개월)
 
@@ -2375,7 +2455,7 @@ print(result["source_documents"])
 
 ---
 
-## 11. 예상 효과 요약
+## 19. 예상 효과 요약
 
 ### 성능 개선
 
@@ -2406,7 +2486,7 @@ print(result["source_documents"])
 
 ---
 
-## 12. 학습 리소스
+## 20. 학습 리소스
 
 각 기술에 대한 팀원 이해도 향상을 위한 추천 자료입니다.
 
