@@ -1,24 +1,76 @@
-name: Deploy to EC2
+name: Deploy to Kubernetes
 
 on:
-  push:
-    branches: [ develop ]
+  workflow_run:
+    workflows:
+      - CI - Product
+      - CI - Member
+      - CI - Order
+      - CI - Auction
+      - CI - Payment
+      - CI - Infra
+    types: [completed]
+    branches: [develop]
+  workflow_dispatch:
+    inputs:
+      deployments:
+        description: "Space-separated deployments to restart, or all"
+        required: false
+        default: "all"
+
+concurrency:
+  group: deploy-kubernetes-${{ github.event.workflow_run.head_branch || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   deploy:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to EC2
+      - name: Select deployments
+        id: select
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            DEPLOYMENTS="${{ github.event.inputs.deployments }}"
+          else
+            case "${{ github.event.workflow_run.name }}" in
+              "CI - Product") DEPLOYMENTS="product" ;;
+              "CI - Member") DEPLOYMENTS="member" ;;
+              "CI - Order") DEPLOYMENTS="order" ;;
+              "CI - Auction") DEPLOYMENTS="auction" ;;
+              "CI - Payment") DEPLOYMENTS="payment" ;;
+              "CI - Infra") DEPLOYMENTS="apigateway config discovery" ;;
+              *) DEPLOYMENTS="" ;;
+            esac
+          fi
+
+          if [ "$DEPLOYMENTS" = "all" ]; then
+            DEPLOYMENTS="apigateway config discovery member product order auction payment"
+          fi
+
+          echo "deployments=$DEPLOYMENTS" >> "$GITHUB_OUTPUT"
+
+      - name: Restart Kubernetes deployments
+        if: steps.select.outputs.deployments != ''
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
-          envs: GH_PAT
+          envs: DEPLOYMENTS
           script: |
-            cd ~/beadv6_6_frontal_BE
-            git pull https://$GH_PAT@github.com/prgrms-be-adv-devcourse/beadv6_6_frontal_BE.git develop
-            docker-compose down
-            docker-compose up -d --build
+            set -e
+            NAMESPACE=biddy
+
+            for deployment in $DEPLOYMENTS; do
+              kubectl rollout restart "deployment/${deployment}" -n "$NAMESPACE"
+            done
+
+            for deployment in $DEPLOYMENTS; do
+              kubectl rollout status "deployment/${deployment}" -n "$NAMESPACE" --timeout=180s
+            done
         env:
-          GH_PAT: ${{ secrets.GH_PAT }}
+          DEPLOYMENTS: ${{ steps.select.outputs.deployments }}
