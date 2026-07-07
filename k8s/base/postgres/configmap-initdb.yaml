@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-initdb
+data:
+  01-create-databases.sql: |
+    CREATE DATABASE biddy_member;
+    \connect biddy_member
+    CREATE SCHEMA IF NOT EXISTS member_biddy;
+
+    CREATE DATABASE biddy_product;
+    CREATE DATABASE biddy_order;
+    CREATE DATABASE biddy_auction;
+    CREATE DATABASE biddy_payment;
+

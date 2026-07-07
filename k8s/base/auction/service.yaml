@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: auction
+spec:
+  selector:
+    app: auction
+  ports:
+    - name: http
+      port: 8084
+      targetPort: 8084
+
