@@ -63,6 +63,7 @@ jobs:
           envs: DEPLOYMENTS
           script: |
             set -e
+            export KUBECONFIG=~/.kube/config
             NAMESPACE=biddy
 
             for deployment in $DEPLOYMENTS; do
