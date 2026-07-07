@@ -26,3 +26,5 @@ These additional references should also help you:
 * 마지막 전체 CI/CD 동작 확인을 위한 테스트 업데이트
 
 * 파이프라인 최종 성공 여부 확인용 테스트 커밋
+
+* 워커 노드 재부팅 후 member 서비스 단독 테스트 커밋
