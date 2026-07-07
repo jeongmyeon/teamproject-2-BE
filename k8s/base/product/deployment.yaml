@@ -12,10 +12,12 @@ spec:
       labels:
         app: product
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: product
-          image: CHANGE_ME/biddy-product:latest
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/prgrms-be-adv-devcourse/product:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8082
           envFrom:

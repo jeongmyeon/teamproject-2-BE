@@ -12,10 +12,12 @@ spec:
       labels:
         app: apigateway
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: apigateway
-          image: CHANGE_ME/biddy-apigateway:latest
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/prgrms-be-adv-devcourse/apigateway:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8000
           envFrom:

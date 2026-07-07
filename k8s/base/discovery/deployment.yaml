@@ -12,10 +12,12 @@ spec:
       labels:
         app: discovery
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: discovery
-          image: CHANGE_ME/biddy-discovery:latest
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/prgrms-be-adv-devcourse/discovery:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8761
           readinessProbe:
