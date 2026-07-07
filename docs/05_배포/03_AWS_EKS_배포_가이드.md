@@ -1,568 +1,435 @@
-# Biddy MSA AWS EKS 배포 가이드
+# Biddy K8s 2-Node 클러스터 배포 가이드
 
 ## 문서 정보
 - **프로젝트**: Biddy 실시간 경매 플랫폼
-- **버전**: 1.0
-- **작성일**: 2026-07-02
-- **대상**: AWS EKS (Elastic Kubernetes Service) 프로덕션 배포
+- **버전**: 2.0
+- **작성일**: 2026-07-07
+- **대상**: AWS EC2 기반 Self-managed Kubernetes (2 nodes)
+- **구성**: t3.large (마스터+워커) + t3.medium (워커)
 
 ---
 
-## 1. AWS EKS 개요
+## 1. 아키텍처 개요
 
-### 1-1. EKS란?
-
-Amazon Elastic Kubernetes Service(EKS)는 AWS에서 제공하는 관리형 Kubernetes 서비스입니다.
-- Kubernetes Control Plane 자동 관리
-- AWS 서비스 (RDS, ElastiCache, MSK) 통합
-- IAM 기반 인증 및 권한 관리
-- AWS Load Balancer 자동 프로비저닝
-
-### 1-2. AWS 서비스 구성
-
-| 서비스 | 용도 | Biddy 적용 |
-|--------|------|-----------|
-| **EKS** | Kubernetes 클러스터 | 애플리케이션 오케스트레이션 |
-| **RDS (PostgreSQL)** | 관리형 데이터베이스 | 5개 도메인 DB |
-| **ElastiCache (Redis)** | 관리형 캐시 | Watch 캐시 |
-| **MSK (Kafka)** | 관리형 Kafka | 이벤트 메시징 |
-| **ECR** | 컨테이너 레지스트리 | Docker 이미지 저장 |
-| **ALB** | 애플리케이션 로드밸런서 | Ingress 트래픽 분산 |
-| **EBS** | 블록 스토리지 | PersistentVolume |
-| **CloudWatch** | 모니터링 | 로그 및 메트릭 수집 |
-| **Route53** | DNS | 도메인 관리 |
-| **VPC** | 네트워크 | 격리된 네트워크 환경 |
-
----
-
-## 2. 아키텍처
-
-### 2-1. AWS 인프라 아키텍처
+### 1-1. 인프라 구성
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                       Route 53                              │
-│              (biddy.example.com)                            │
-└───────────────────────┬─────────────────────────────────────┘
-                        │
-┌───────────────────────▼─────────────────────────────────────┐
-│                  Application Load Balancer                  │
-│              (Ingress Controller 연동)                       │
-└───────────────────────┬─────────────────────────────────────┘
-                        │
-┌───────────────────────▼─────────────────────────────────────┐
-│                      VPC (10.0.0.0/16)                      │
-│                                                             │
-│  ┌───────────────────────────────────────────────────────┐ │
-│  │              EKS Cluster (v1.28)                      │ │
-│  │                                                       │ │
-│  │  ┌──────────────────────────────────────────────┐   │ │
-│  │  │   Public Subnet (10.0.1.0/24, 10.0.2.0/24)   │   │ │
-│  │  │        - ALB                                  │   │ │
-│  │  │        - NAT Gateway                          │   │ │
-│  │  └──────────────────────────────────────────────┘   │ │
-│  │                                                       │ │
-│  │  ┌──────────────────────────────────────────────┐   │ │
-│  │  │  Private Subnet (10.0.10.0/24, 10.0.11.0/24) │   │ │
-│  │  │                                              │   │ │
-│  │  │  [Worker Nodes (t3.medium x 3)]              │   │ │
-│  │  │    - API Gateway Pod (x2)                    │   │ │
-│  │  │    - Member Pod (x2)                         │   │ │
-│  │  │    - Product Pod (x2)                        │   │ │
-│  │  │    - Order Pod (x2)                          │   │ │
-│  │  │    - Auction Pod (x3)                        │   │ │
-│  │  │    - Payment Pod (x2)                        │   │ │
-│  │  │    - Discovery Pod (x1)                      │   │ │
-│  │  │    - Config Pod (x1)                         │   │ │
-│  │  └──────────────────────────────────────────────┘   │ │
-│  │                                                       │ │
-│  └───────────────────────────────────────────────────────┘ │
+│                    AWS VPC (10.0.0.0/16)                    │
 │                                                             │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │   Private Subnet (10.0.20.0/24, 10.0.21.0/24)        │  │
+│  │           Application Load Balancer (ALB)            │  │
+│  │                  (Public Subnet)                      │  │
+│  └────────────────────┬─────────────────────────────────┘  │
+│                       │                                     │
+│  ┌────────────────────▼─────────────────────────────────┐  │
+│  │              Private Subnet (10.0.1.0/24)            │  │
 │  │                                                       │  │
-│  │   - RDS PostgreSQL (Multi-AZ)                        │  │
-│  │   - ElastiCache Redis (Cluster Mode)                 │  │
-│  │   - MSK Kafka (3 brokers)                            │  │
-│  └──────────────────────────────────────────────────────┘  │
+│  │  ┌─────────────────────────────────────────────┐    │  │
+│  │  │  Node 1 (t3.large - Master + Worker)       │    │  │
+│  │  │  - Control Plane (API Server, etcd, etc)   │    │  │
+│  │  │  - Worker Pods:                            │    │  │
+│  │  │    * API Gateway (x2)                      │    │  │
+│  │  │    * Auction (x2)                          │    │  │
+│  │  │    * Discovery (x1)                        │    │  │
+│  │  │    * PostgreSQL (StatefulSet)              │    │  │
+│  │  │    * Kafka (StatefulSet)                   │    │  │
+│  │  └─────────────────────────────────────────────┘    │  │
+│  │                                                       │  │
+│  │  ┌─────────────────────────────────────────────┐    │  │
+│  │  │  Node 2 (t3.medium - Worker)               │    │  │
+│  │  │  - Worker Pods:                            │    │  │
+│  │  │    * Member (x2)                           │    │  │
+│  │  │    * Product (x2)                          │    │  │
+│  │  │    * Order (x2)                            │    │  │
+│  │  │    * Payment (x2)                          │    │  │
+│  │  │    * Redis (StatefulSet)                   │    │  │
+│  │  └─────────────────────────────────────────────┘    │  │
+│  └───────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 2-2. 가용 영역(AZ) 구성
+### 1-2. 노드 리소스 배분
 
-```
-┌────────────────────────────────────────────────────────┐
-│                     Region: ap-northeast-2 (Seoul)     │
-│                                                        │
-│  ┌──────────────────┐  ┌──────────────────┐          │
-│  │   AZ-A (2a)      │  │   AZ-C (2c)      │          │
-│  │                  │  │                  │          │
-│  │ - Worker Node 1  │  │ - Worker Node 2  │          │
-│  │ - RDS Primary    │  │ - RDS Standby    │          │
-│  │ - Redis Node 1   │  │ - Redis Node 2   │          │
-│  │ - Kafka Broker 1 │  │ - Kafka Broker 2 │          │
-│  └──────────────────┘  └──────────────────┘          │
-│                                                        │
-│           ┌──────────────────┐                        │
-│           │   AZ-B (2b)      │                        │
-│           │                  │                        │
-│           │ - Worker Node 3  │                        │
-│           │ - Kafka Broker 3 │                        │
-│           └──────────────────┘                        │
-└────────────────────────────────────────────────────────┘
-```
+| 노드 | 인스턴스 타입 | vCPU | RAM | 역할 | 주요 워크로드 |
+|------|--------------|------|-----|------|--------------|
+| **Node 1** | t3.large | 2 | 8GB | Master + Worker | Control Plane + 무거운 서비스 (Auction, Kafka, PostgreSQL) |
+| **Node 2** | t3.medium | 2 | 4GB | Worker | 경량 서비스 (Member, Product, Order, Payment, Redis) |
+
+### 1-3. Pod 배치 전략
+
+| 서비스 | Replicas | 배치 노드 | 이유 |
+|--------|----------|-----------|------|
+| API Gateway | 2 | Node 1 | 트래픽 집중, 메모리 여유 필요 |
+| Auction | 2 | Node 1 | 실시간 입찰, WebSocket 연결 많음 |
+| Member | 2 | Node 2 | 상대적으로 경량 |
+| Product | 2 | Node 2 | 상대적으로 경량 |
+| Order | 2 | Node 2 | 상대적으로 경량 |
+| Payment | 2 | Node 2 | 상대적으로 경량 |
+| Discovery | 1 | Node 1 | 단일 인스턴스, 안정성 중요 |
+| PostgreSQL | 1 | Node 1 | Stateful, 로컬 디스크 사용 |
+| Kafka | 1 | Node 1 | Stateful, 메모리 많이 사용 |
+| Redis | 1 | Node 2 | 메모리 사용량 적음 |
 
 ---
 
-## 3. 사전 준비
+## 2. AWS 인프라 사전 준비 (AWS 담당자)
 
-### 3-1. AWS CLI 설치 및 설정
-
-```bash
-# AWS CLI 설치
-curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-unzip awscliv2.zip
-sudo ./aws/install
-
-# 인증 설정
-aws configure
-# AWS Access Key ID: YOUR_ACCESS_KEY
-# AWS Secret Access Key: YOUR_SECRET_KEY
-# Default region: ap-northeast-2
-# Default output format: json
-
-# 확인
-aws sts get-caller-identity
-```
-
-### 3-2. kubectl 및 eksctl 설치
+### 2-1. VPC 및 서브넷 구성
 
 ```bash
-# kubectl 설치
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-
-# eksctl 설치 (EKS 클러스터 관리 도구)
-curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-sudo mv /tmp/eksctl /usr/local/bin
-
-# 버전 확인
-kubectl version --client
-eksctl version
-```
-
-### 3-3. IAM 권한 설정
-
-필요한 IAM 권한:
-- `AmazonEKSClusterPolicy`
-- `AmazonEKSWorkerNodePolicy`
-- `AmazonEC2ContainerRegistryReadOnly`
-- `AmazonEKS_CNI_Policy`
-
----
-
-## 4. EKS 클러스터 생성
-
-### 4-1. eksctl로 클러스터 생성
-
-```yaml
-# eks-cluster-config.yaml
-apiVersion: eksctl.io/v1alpha5
-kind: ClusterConfig
-
-metadata:
-  name: biddy-eks-cluster
-  region: ap-northeast-2
-  version: "1.28"
-
-vpc:
-  cidr: 10.0.0.0/16
-  nat:
-    gateway: Single  # 비용 절감 시 Single, 고가용성 시 HighlyAvailable
-
-availabilityZones:
-  - ap-northeast-2a
-  - ap-northeast-2c
-
-managedNodeGroups:
-  - name: biddy-workers
-    instanceType: t3.medium
-    desiredCapacity: 3
-    minSize: 2
-    maxSize: 6
-    volumeSize: 30
-    ssh:
-      allow: true
-    privateNetworking: true
-    iam:
-      withAddonPolicies:
-        imageBuilder: true
-        autoScaler: true
-        ebs: true
-        efs: true
-        albIngress: true
-        cloudWatch: true
-
-addons:
-  - name: vpc-cni
-  - name: coredns
-  - name: kube-proxy
-
-cloudWatch:
-  clusterLogging:
-    enableTypes:
-      - api
-      - audit
-      - authenticator
-      - controllerManager
-      - scheduler
-```
-
-```bash
-# 클러스터 생성 (약 15~20분 소요)
-eksctl create cluster -f eks-cluster-config.yaml
-
-# 클러스터 확인
-kubectl get nodes
-kubectl cluster-info
-
-# 컨텍스트 확인
-kubectl config current-context
-# 출력: your-username@biddy-eks-cluster.ap-northeast-2.eksctl.io
-```
-
-### 4-2. AWS Load Balancer Controller 설치
-
-```bash
-# IAM Policy 생성
-curl -o iam-policy.json https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.7.0/docs/install/iam_policy.json
-
-aws iam create-policy \
-  --policy-name AWSLoadBalancerControllerIAMPolicy \
-  --policy-document file://iam-policy.json
-
-# OIDC Provider 생성
-eksctl utils associate-iam-oidc-provider \
+# VPC 생성
+aws ec2 create-vpc \
+  --cidr-block 10.0.0.0/16 \
   --region ap-northeast-2 \
-  --cluster biddy-eks-cluster \
-  --approve
+  --tag-specifications 'ResourceType=vpc,Tags=[{Key=Name,Value=biddy-vpc}]'
 
-# Service Account 생성
-eksctl create iamserviceaccount \
-  --cluster=biddy-eks-cluster \
-  --namespace=kube-system \
-  --name=aws-load-balancer-controller \
-  --attach-policy-arn=arn:aws:iam::YOUR_ACCOUNT_ID:policy/AWSLoadBalancerControllerIAMPolicy \
-  --override-existing-serviceaccounts \
-  --region ap-northeast-2 \
-  --approve
+# 퍼블릭 서브넷 (ALB용)
+aws ec2 create-subnet \
+  --vpc-id vpc-xxxxx \
+  --cidr-block 10.0.0.0/24 \
+  --availability-zone ap-northeast-2a \
+  --tag-specifications 'ResourceType=subnet,Tags=[{Key=Name,Value=biddy-public-subnet}]'
 
-# Helm으로 설치
-helm repo add eks https://aws.github.io/eks-charts
-helm repo update
+# 프라이빗 서브넷 (K8s 노드용)
+aws ec2 create-subnet \
+  --vpc-id vpc-xxxxx \
+  --cidr-block 10.0.1.0/24 \
+  --availability-zone ap-northeast-2a \
+  --tag-specifications 'ResourceType=subnet,Tags=[{Key=Name,Value=biddy-private-subnet}]'
 
-helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
-  -n kube-system \
-  --set clusterName=biddy-eks-cluster \
-  --set serviceAccount.create=false \
-  --set serviceAccount.name=aws-load-balancer-controller
+# 인터넷 게이트웨이
+aws ec2 create-internet-gateway \
+  --tag-specifications 'ResourceType=internet-gateway,Tags=[{Key=Name,Value=biddy-igw}]'
 
-# 확인
-kubectl get deployment -n kube-system aws-load-balancer-controller
+aws ec2 attach-internet-gateway \
+  --vpc-id vpc-xxxxx \
+  --internet-gateway-id igw-xxxxx
+
+# NAT Gateway (프라이빗 서브넷 외부 통신용)
+aws ec2 allocate-address --domain vpc
+aws ec2 create-nat-gateway \
+  --subnet-id subnet-xxxxx \
+  --allocation-id eipalloc-xxxxx
 ```
 
-### 4-3. EBS CSI Driver 설치 (PersistentVolume용)
+### 2-2. 보안 그룹 생성
 
 ```bash
-# IAM Role 생성
-eksctl create iamserviceaccount \
-  --name ebs-csi-controller-sa \
-  --namespace kube-system \
-  --cluster biddy-eks-cluster \
-  --attach-policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy \
-  --approve \
-  --role-name AmazonEKS_EBS_CSI_DriverRole
-
-# EBS CSI Driver 설치
-eksctl create addon \
-  --name aws-ebs-csi-driver \
-  --cluster biddy-eks-cluster \
-  --service-account-role-arn arn:aws:iam::YOUR_ACCOUNT_ID:role/AmazonEKS_EBS_CSI_DriverRole \
-  --force
-
-# 확인
-kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-ebs-csi-driver
-```
-
----
-
-## 5. RDS PostgreSQL 생성
-
-### 5-1. RDS Subnet Group 생성
-
-```bash
-aws rds create-db-subnet-group \
-  --db-subnet-group-name biddy-db-subnet-group \
-  --db-subnet-group-description "Biddy RDS Subnet Group" \
-  --subnet-ids subnet-xxxxx subnet-yyyyy \
-  --tags Key=Name,Value=biddy-db-subnet-group
-```
-
-### 5-2. Security Group 생성
-
-```bash
-# RDS 보안 그룹 생성
+# K8s 노드 보안 그룹
 aws ec2 create-security-group \
-  --group-name biddy-rds-sg \
-  --description "Biddy RDS Security Group" \
+  --group-name biddy-k8s-nodes \
+  --description "Biddy K8s Nodes Security Group" \
   --vpc-id vpc-xxxxx
 
-# EKS Worker Node에서 접근 허용
+# 노드 간 통신 허용 (모든 포트)
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-xxxxx \
+  --protocol all \
+  --source-group sg-xxxxx
+
+# SSH 접근 (관리자 IP만)
 aws ec2 authorize-security-group-ingress \
   --group-id sg-xxxxx \
   --protocol tcp \
-  --port 5432 \
-  --source-group sg-yyyyy  # EKS Worker Node SG
-```
+  --port 22 \
+  --cidr YOUR_IP/32
 
-### 5-3. RDS PostgreSQL 인스턴스 생성
-
-```bash
-# RDS 생성 (Multi-AZ, db.t3.medium)
-aws rds create-db-instance \
-  --db-instance-identifier biddy-postgres \
-  --db-instance-class db.t3.medium \
-  --engine postgres \
-  --engine-version 16.1 \
-  --master-username biddy \
-  --master-user-password 'YourSecurePassword123!' \
-  --allocated-storage 100 \
-  --storage-type gp3 \
-  --storage-encrypted \
-  --multi-az \
-  --db-subnet-group-name biddy-db-subnet-group \
-  --vpc-security-group-ids sg-xxxxx \
-  --backup-retention-period 7 \
-  --preferred-backup-window "03:00-04:00" \
-  --preferred-maintenance-window "mon:04:00-mon:05:00" \
-  --enable-cloudwatch-logs-exports '["postgresql"]' \
-  --tags Key=Name,Value=biddy-postgres
-
-# RDS 엔드포인트 확인 (약 10분 후)
-aws rds describe-db-instances \
-  --db-instance-identifier biddy-postgres \
-  --query 'DBInstances[0].Endpoint.Address' \
-  --output text
-# 출력 예: biddy-postgres.xxxxx.ap-northeast-2.rds.amazonaws.com
-```
-
-### 5-4. RDS 데이터베이스 초기화
-
-```bash
-# PostgreSQL 클라이언트 설치
-sudo apt-get install postgresql-client
-
-# RDS 접속
-export RDS_ENDPOINT="biddy-postgres.xxxxx.ap-northeast-2.rds.amazonaws.com"
-psql -h $RDS_ENDPOINT -U biddy -d postgres
-
-# 데이터베이스 생성
-CREATE DATABASE biddy_member;
-CREATE DATABASE biddy_product;
-CREATE DATABASE biddy_order;
-CREATE DATABASE biddy_auction;
-CREATE DATABASE biddy_payment;
-
-# 확인
-\l
-\q
-```
-
----
-
-## 6. ElastiCache Redis 생성
-
-### 6-1. ElastiCache Subnet Group 생성
-
-```bash
-aws elasticache create-cache-subnet-group \
-  --cache-subnet-group-name biddy-redis-subnet-group \
-  --cache-subnet-group-description "Biddy Redis Subnet Group" \
-  --subnet-ids subnet-xxxxx subnet-yyyyy
-```
-
-### 6-2. Security Group 생성
-
-```bash
-# Redis 보안 그룹
-aws ec2 create-security-group \
-  --group-name biddy-redis-sg \
-  --description "Biddy Redis Security Group" \
-  --vpc-id vpc-xxxxx
-
-# EKS Worker Node에서 접근 허용
+# Kubernetes API Server (6443)
 aws ec2 authorize-security-group-ingress \
   --group-id sg-xxxxx \
   --protocol tcp \
-  --port 6379 \
-  --source-group sg-yyyyy  # EKS Worker Node SG
+  --port 6443 \
+  --cidr 10.0.0.0/16
+
+# NodePort 범위 (30000-32767)
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-xxxxx \
+  --protocol tcp \
+  --port 30000-32767 \
+  --cidr 0.0.0.0/0
 ```
 
-### 6-3. ElastiCache Redis 클러스터 생성
+### 2-3. EC2 인스턴스 생성
 
 ```bash
-# Redis 클러스터 생성 (cache.t3.small, Cluster Mode Disabled)
-aws elasticache create-replication-group \
-  --replication-group-id biddy-redis \
-  --replication-group-description "Biddy Redis Cluster" \
-  --engine redis \
-  --engine-version 7.0 \
-  --cache-node-type cache.t3.small \
-  --num-cache-clusters 2 \
-  --cache-subnet-group-name biddy-redis-subnet-group \
+# 마스터 노드 (t3.large)
+aws ec2 run-instances \
+  --image-id ami-0c9c942bd7bf113a2 \
+  --instance-type t3.large \
+  --key-name your-key-pair \
   --security-group-ids sg-xxxxx \
-  --at-rest-encryption-enabled \
-  --transit-encryption-enabled \
-  --automatic-failover-enabled
+  --subnet-id subnet-xxxxx \
+  --private-ip-address 10.0.1.10 \
+  --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":50,"VolumeType":"gp3"}}]' \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=biddy-k8s-master},{Key=Role,Value=master}]'
 
-# Redis 엔드포인트 확인
-aws elasticache describe-replication-groups \
-  --replication-group-id biddy-redis \
-  --query 'ReplicationGroups[0].NodeGroups[0].PrimaryEndpoint.Address' \
-  --output text
-# 출력 예: biddy-redis.xxxxx.ng.0001.apne2.cache.amazonaws.com
+# 워커 노드 (t3.medium)
+aws ec2 run-instances \
+  --image-id ami-0c9c942bd7bf113a2 \
+  --instance-type t3.medium \
+  --key-name your-key-pair \
+  --security-group-ids sg-xxxxx \
+  --subnet-id subnet-xxxxx \
+  --private-ip-address 10.0.1.11 \
+  --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":30,"VolumeType":"gp3"}}]' \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=biddy-k8s-worker1},{Key=Role,Value=worker}]'
 ```
 
 ---
 
-## 7. MSK (Managed Kafka) 생성
+## 3. Kubernetes 클러스터 구성 (AWS 담당자)
 
-### 7-1. MSK 클러스터 생성
+### 3-1. 공통 설정 (모든 노드)
 
 ```bash
-# MSK 설정 파일 생성
-cat > msk-cluster-config.json <<EOF
-{
-  "ClusterName": "biddy-kafka",
-  "KafkaVersion": "3.5.1",
-  "NumberOfBrokerNodes": 3,
-  "BrokerNodeGroupInfo": {
-    "InstanceType": "kafka.t3.small",
-    "ClientSubnets": [
-      "subnet-xxxxx",
-      "subnet-yyyyy",
-      "subnet-zzzzz"
-    ],
-    "SecurityGroups": ["sg-xxxxx"],
-    "StorageInfo": {
-      "EbsStorageInfo": {
-        "VolumeSize": 100
-      }
-    }
-  },
-  "EncryptionInfo": {
-    "EncryptionInTransit": {
-      "ClientBroker": "TLS_PLAINTEXT",
-      "InCluster": true
-    }
-  },
-  "EnhancedMonitoring": "DEFAULT",
-  "OpenMonitoring": {
-    "Prometheus": {
-      "JmxExporter": {
-        "EnabledInBroker": true
-      },
-      "NodeExporter": {
-        "EnabledInBroker": true
-      }
-    }
-  }
-}
+# 모든 노드에서 실행
+ssh -i your-key.pem ubuntu@<NODE_IP>
+
+# 시스템 업데이트
+sudo apt-get update && sudo apt-get upgrade -y
+
+# 컨테이너 런타임 설치 (containerd)
+sudo apt-get install -y containerd
+sudo mkdir -p /etc/containerd
+containerd config default | sudo tee /etc/containerd/config.toml
+sudo systemctl restart containerd
+sudo systemctl enable containerd
+
+# Kubernetes 패키지 설치
+sudo apt-get install -y apt-transport-https ca-certificates curl
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+sudo apt-get update
+sudo apt-get install -y kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl
+
+# 스왑 비활성화 (Kubernetes 요구사항)
+sudo swapoff -a
+sudo sed -i '/ swap / s/^/#/' /etc/fstab
+
+# 커널 모듈 로드
+cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
+overlay
+br_netfilter
 EOF
 
-# MSK 클러스터 생성 (약 20~30분 소요)
-aws kafka create-cluster --cli-input-json file://msk-cluster-config.json
+sudo modprobe overlay
+sudo modprobe br_netfilter
 
-# 클러스터 ARN 확인
-aws kafka list-clusters --query 'ClusterInfoList[0].ClusterArn' --output text
+# sysctl 설정
+cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1
+EOF
 
-# Bootstrap 서버 확인
-aws kafka get-bootstrap-brokers --cluster-arn arn:aws:kafka:ap-northeast-2:ACCOUNT_ID:cluster/biddy-kafka/xxxxx
-# 출력 예: b-1.biddy-kafka.xxxxx.c2.kafka.ap-northeast-2.amazonaws.com:9092,b-2...
+sudo sysctl --system
 ```
 
----
-
-## 8. ECR (Elastic Container Registry) 설정
-
-### 8-1. ECR 리포지토리 생성
+### 3-2. 마스터 노드 초기화 (Node 1 - t3.large)
 
 ```bash
-# 각 서비스별 리포지토리 생성
-for service in discovery config apigateway member product order auction payment; do
-  aws ecr create-repository \
-    --repository-name biddy/$service \
-    --region ap-northeast-2 \
-    --image-scanning-configuration scanOnPush=true
-done
+# 마스터 노드에서만 실행
+sudo kubeadm init \
+  --pod-network-cidr=192.168.0.0/16 \
+  --apiserver-advertise-address=10.0.1.10 \
+  --node-name=biddy-k8s-master
+
+# 출력된 join 명령어를 복사해두세요!
+# kubeadm join 10.0.1.10:6443 --token xxxxx --discovery-token-ca-cert-hash sha256:xxxxx
+
+# kubectl 설정
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+# CNI 플러그인 설치 (Calico)
+kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
+
+# 마스터 노드도 워커로 사용 (taint 제거)
+kubectl taint nodes biddy-k8s-master node-role.kubernetes.io/control-plane:NoSchedule-
+
+# 노드 확인
+kubectl get nodes
+```
+
+### 3-3. 워커 노드 조인 (Node 2 - t3.medium)
+
+```bash
+# 워커 노드에서 실행
+sudo kubeadm join 10.0.1.10:6443 \
+  --token xxxxx \
+  --discovery-token-ca-cert-hash sha256:xxxxx \
+  --node-name=biddy-k8s-worker1
+
+# 마스터 노드에서 확인
+kubectl get nodes
+# NAME                STATUS   ROLES           AGE   VERSION
+# biddy-k8s-master    Ready    control-plane   5m    v1.28.x
+# biddy-k8s-worker1   Ready    <none>          1m    v1.28.x
+```
+
+### 3-4. 노드 라벨링 (Pod 배치 제어)
+
+```bash
+# 마스터 노드에 라벨 추가
+kubectl label nodes biddy-k8s-master node-type=large
+kubectl label nodes biddy-k8s-master workload=heavy
+
+# 워커 노드에 라벨 추가
+kubectl label nodes biddy-k8s-worker1 node-type=medium
+kubectl label nodes biddy-k8s-worker1 workload=light
 
 # 확인
-aws ecr describe-repositories --query 'repositories[*].repositoryUri' --output table
-```
-
-### 8-2. Docker 이미지 빌드 및 푸시
-
-```bash
-# ECR 로그인
-aws ecr get-login-password --region ap-northeast-2 | \
-  docker login --username AWS --password-stdin YOUR_ACCOUNT_ID.dkr.ecr.ap-northeast-2.amazonaws.com
-
-# 프로젝트 빌드
-./gradlew clean build -x test
-
-# 이미지 빌드 및 푸시
-export ECR_REGISTRY="YOUR_ACCOUNT_ID.dkr.ecr.ap-northeast-2.amazonaws.com"
-export VERSION="v1.0.0"
-
-# Discovery
-docker build -t $ECR_REGISTRY/biddy/discovery:$VERSION ./discovery
-docker push $ECR_REGISTRY/biddy/discovery:$VERSION
-
-# API Gateway
-docker build -t $ECR_REGISTRY/biddy/apigateway:$VERSION ./apigateway
-docker push $ECR_REGISTRY/biddy/apigateway:$VERSION
-
-# Auction
-docker build -t $ECR_REGISTRY/biddy/auction:$VERSION ./auction
-docker push $ECR_REGISTRY/biddy/auction:$VERSION
-
-# ... (나머지 서비스도 동일)
-
-# 이미지 확인
-aws ecr describe-images --repository-name biddy/auction
+kubectl get nodes --show-labels
 ```
 
 ---
 
-## 9. Kubernetes 리소스 배포
+## 4. 스토리지 구성 (AWS 담당자)
 
-### 9-1. 네임스페이스 및 ConfigMap
+### 4-1. StorageClass 생성 (로컬 EBS 볼륨)
 
 ```yaml
-# k8s-aws/namespaces.yaml
+# k8s/storage/storageclass.yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+```
+
+```bash
+kubectl apply -f k8s/storage/storageclass.yaml
+```
+
+### 4-2. PersistentVolume 생성 (각 노드)
+
+**Node 1 (마스터) - PostgreSQL & Kafka용**
+
+```yaml
+# k8s/storage/pv-postgres.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-pv
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /data/postgres
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - biddy-k8s-master
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: kafka-pv
+spec:
+  capacity:
+    storage: 15Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /data/kafka
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - biddy-k8s-master
+```
+
+**Node 2 (워커) - Redis용**
+
+```yaml
+# k8s/storage/pv-redis.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: redis-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /data/redis
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - biddy-k8s-worker1
+```
+
+**디렉토리 생성 (각 노드에서 실행)**
+
+```bash
+# Node 1 (마스터)
+sudo mkdir -p /data/postgres /data/kafka
+sudo chmod 777 /data/postgres /data/kafka
+
+# Node 2 (워커)
+sudo mkdir -p /data/redis
+sudo chmod 777 /data/redis
+```
+
+```bash
+# PV 생성
+kubectl apply -f k8s/storage/
+kubectl get pv
+```
+
+---
+
+## 5. 네임스페이스 및 ConfigMap 생성
+
+### 5-1. 네임스페이스
+
+```yaml
+# k8s/base/namespaces.yaml
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: biddy-services
+  name: biddy-infra
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: biddy-gateway
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: biddy-services
 ```
 
+### 5-2. ConfigMap (공통 설정)
+
 ```yaml
-# k8s-aws/config/configmap.yaml
+# k8s/base/configmap.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -570,16 +437,18 @@ metadata:
   namespace: biddy-services
 data:
   TZ: "Asia/Seoul"
-  EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: "http://discovery.biddy-services.svc.cluster.local:8761/eureka/"
-  KAFKA_BOOTSTRAP_SERVERS: "b-1.biddy-kafka.xxxxx.c2.kafka.ap-northeast-2.amazonaws.com:9092,b-2.biddy-kafka.xxxxx.c2.kafka.ap-northeast-2.amazonaws.com:9092"
-  POSTGRES_HOST: "biddy-postgres.xxxxx.ap-northeast-2.rds.amazonaws.com"
+  EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: "http://discovery.biddy-infra.svc.cluster.local:8761/eureka/"
+  KAFKA_BOOTSTRAP_SERVERS: "kafka.biddy-infra.svc.cluster.local:9092"
+  POSTGRES_HOST: "postgres.biddy-infra.svc.cluster.local"
   POSTGRES_PORT: "5432"
-  REDIS_HOST: "biddy-redis.xxxxx.ng.0001.apne2.cache.amazonaws.com"
+  REDIS_HOST: "redis.biddy-infra.svc.cluster.local"
   REDIS_PORT: "6379"
 ```
 
+### 5-3. Secret (민감 정보)
+
 ```yaml
-# k8s-aws/config/secrets.yaml
+# k8s/base/secrets.yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -588,75 +457,224 @@ metadata:
 type: Opaque
 stringData:
   POSTGRES_USER: "biddy"
-  POSTGRES_PASSWORD: "YourSecurePassword123!"
+  POSTGRES_PASSWORD: "biddy1234"
   JWT_SECRET: "devcourse6devcourse6devcourse6devcourse6"
   MAIL_USERNAME: "your_email@gmail.com"
   MAIL_PASSWORD: "your_app_password"
   TOSS_PAYMENTS_SECRET_KEY: "test_sk_xxxxx"
 ```
 
-### 9-2. Discovery 배포
+```bash
+kubectl apply -f k8s/base/
+```
+
+---
+
+## 6. 도메인 담당자용 - 서비스별 배포 가이드
+
+> **각 도메인 담당자는 자신의 서비스 YAML만 수정하여 배포합니다.**
+
+### 6-1. Member 서비스 담당자
+
+**파일 경로**: `k8s/services/member.yaml`
 
 ```yaml
-# k8s-aws/services/discovery.yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: discovery
+  name: member
   namespace: biddy-services
 spec:
   selector:
-    app: discovery
+    app: member
   ports:
-    - port: 8761
-      targetPort: 8761
+    - port: 8081
+      targetPort: 8081
   type: ClusterIP
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: discovery
+  name: member
   namespace: biddy-services
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
-      app: discovery
+      app: member
   template:
     metadata:
       labels:
-        app: discovery
+        app: member
     spec:
+      # Node 2 (워커)에만 배포
+      nodeSelector:
+        workload: light
       containers:
-      - name: discovery
-        image: YOUR_ACCOUNT_ID.dkr.ecr.ap-northeast-2.amazonaws.com/biddy/discovery:v1.0.0
+      - name: member
+        image: your-registry/biddy-member:latest
         ports:
-        - containerPort: 8761
+        - containerPort: 8081
+        env:
+        - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+          valueFrom:
+            configMapKeyRef:
+              name: biddy-common-config
+              key: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+        - name: POSTGRES_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: biddy-common-config
+              key: POSTGRES_HOST
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: biddy-secrets
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: biddy-secrets
+              key: POSTGRES_PASSWORD
+        - name: MEMBER_DB
+          value: "biddy_member"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: biddy-secrets
+              key: JWT_SECRET
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
         livenessProbe:
           httpGet:
-            path: /actuator/health
-            port: 8761
-          initialDelaySeconds: 60
+            path: /actuator/health/liveness
+            port: 8081
+          initialDelaySeconds: 90
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /actuator/health
-            port: 8761
-          initialDelaySeconds: 30
+            path: /actuator/health/readiness
+            port: 8081
+          initialDelaySeconds: 60
           periodSeconds: 5
-        resources:
-          requests:
-            memory: "512Mi"
-            cpu: "250m"
-          limits:
-            memory: "1Gi"
-            cpu: "500m"
 ```
 
-### 9-3. Auction 서비스 배포 (RDS, Redis, MSK 연동)
+**배포 명령어**:
+```bash
+kubectl apply -f k8s/services/member.yaml
+kubectl get pods -n biddy-services -l app=member
+kubectl logs -f deployment/member -n biddy-services
+```
+
+---
+
+### 6-2. Product 서비스 담당자
+
+**파일 경로**: `k8s/services/product.yaml`
 
 ```yaml
-# k8s-aws/services/auction.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: product
+  namespace: biddy-services
+spec:
+  selector:
+    app: product
+  ports:
+    - port: 8082
+      targetPort: 8082
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product
+  namespace: biddy-services
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: product
+  template:
+    metadata:
+      labels:
+        app: product
+    spec:
+      nodeSelector:
+        workload: light
+      containers:
+      - name: product
+        image: your-registry/biddy-product:latest
+        ports:
+        - containerPort: 8082
+        env:
+        - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+          valueFrom:
+            configMapKeyRef:
+              name: biddy-common-config
+              key: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            configMapKeyRef:
+              name: biddy-common-config
+              key: KAFKA_BOOTSTRAP_SERVERS
+        - name: POSTGRES_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: biddy-common-config
+              key: POSTGRES_HOST
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: biddy-secrets
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: biddy-secrets
+              key: POSTGRES_PASSWORD
+        - name: PRODUCT_DB
+          value: "biddy_product"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8082
+          initialDelaySeconds: 90
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8082
+          initialDelaySeconds: 60
+          periodSeconds: 5
+```
+
+**배포 명령어**:
+```bash
+kubectl apply -f k8s/services/product.yaml
+kubectl get pods -n biddy-services -l app=product
+```
+
+---
+
+### 6-3. Auction 서비스 담당자
+
+**파일 경로**: `k8s/services/auction.yaml`
+
+```yaml
 apiVersion: v1
 kind: Service
 metadata:
@@ -676,7 +694,7 @@ metadata:
   name: auction
   namespace: biddy-services
 spec:
-  replicas: 3
+  replicas: 2
   selector:
     matchLabels:
       app: auction
@@ -685,9 +703,12 @@ spec:
       labels:
         app: auction
     spec:
+      # Node 1 (마스터)에만 배포 (무거운 워크로드)
+      nodeSelector:
+        workload: heavy
       containers:
       - name: auction
-        image: YOUR_ACCOUNT_ID.dkr.ecr.ap-northeast-2.amazonaws.com/biddy/auction:v1.0.0
+        image: your-registry/biddy-auction:latest
         ports:
         - containerPort: 8084
         env:
@@ -706,11 +727,6 @@ spec:
             configMapKeyRef:
               name: biddy-common-config
               key: POSTGRES_HOST
-        - name: POSTGRES_PORT
-          valueFrom:
-            configMapKeyRef:
-              name: biddy-common-config
-              key: POSTGRES_PORT
         - name: POSTGRES_USER
           valueFrom:
             secretKeyRef:
@@ -728,18 +744,18 @@ spec:
             configMapKeyRef:
               name: biddy-common-config
               key: REDIS_HOST
-        - name: REDIS_PORT
-          valueFrom:
-            configMapKeyRef:
-              name: biddy-common-config
-              key: REDIS_PORT
         - name: JWT_SECRET
           valueFrom:
             secretKeyRef:
               name: biddy-secrets
               key: JWT_SECRET
-        - name: TZ
-          value: "Asia/Seoul"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
         livenessProbe:
           httpGet:
             path: /actuator/health/liveness
@@ -752,39 +768,503 @@ spec:
             port: 8084
           initialDelaySeconds: 60
           periodSeconds: 5
+```
+
+**배포 명령어**:
+```bash
+kubectl apply -f k8s/services/auction.yaml
+kubectl get pods -n biddy-services -l app=auction -o wide
+# Node 1에만 배포되는지 확인
+```
+
+---
+
+### 6-4. Order 서비스 담당자
+
+**파일 경로**: `k8s/services/order.yaml`
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: order
+  namespace: biddy-services
+spec:
+  selector:
+    app: order
+  ports:
+    - port: 8083
+      targetPort: 8083
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order
+  namespace: biddy-services
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: order
+  template:
+    metadata:
+      labels:
+        app: order
+    spec:
+      nodeSelector:
+        workload: light
+      containers:
+      - name: order
+        image: your-registry/biddy-order:latest
+        ports:
+        - containerPort: 8083
+        env:
+        - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+          valueFrom:
+            configMapKeyRef:
+              name: biddy-common-config
+              key: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            configMapKeyRef:
+              name: biddy-common-config
+              key: KAFKA_BOOTSTRAP_SERVERS
+        - name: POSTGRES_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: biddy-common-config
+              key: POSTGRES_HOST
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: biddy-secrets
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: biddy-secrets
+              key: POSTGRES_PASSWORD
+        - name: ORDER_DB
+          value: "biddy_order"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8083
+          initialDelaySeconds: 90
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8083
+          initialDelaySeconds: 60
+          periodSeconds: 5
+```
+
+---
+
+### 6-5. Payment 서비스 담당자
+
+**파일 경로**: `k8s/services/payment.yaml`
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment
+  namespace: biddy-services
+spec:
+  selector:
+    app: payment
+  ports:
+    - port: 8085
+      targetPort: 8085
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment
+  namespace: biddy-services
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payment
+  template:
+    metadata:
+      labels:
+        app: payment
+    spec:
+      nodeSelector:
+        workload: light
+      containers:
+      - name: payment
+        image: your-registry/biddy-payment:latest
+        ports:
+        - containerPort: 8085
+        env:
+        - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+          valueFrom:
+            configMapKeyRef:
+              name: biddy-common-config
+              key: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            configMapKeyRef:
+              name: biddy-common-config
+              key: KAFKA_BOOTSTRAP_SERVERS
+        - name: POSTGRES_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: biddy-common-config
+              key: POSTGRES_HOST
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: biddy-secrets
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: biddy-secrets
+              key: POSTGRES_PASSWORD
+        - name: PAYMENT_DB
+          value: "biddy_payment"
+        - name: TOSS_PAYMENTS_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: biddy-secrets
+              key: TOSS_PAYMENTS_SECRET_KEY
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8085
+          initialDelaySeconds: 90
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8085
+          initialDelaySeconds: 60
+          periodSeconds: 5
+```
+
+---
+
+## 7. 인프라 서비스 배포 (AWS 담당자)
+
+### 7-1. PostgreSQL (StatefulSet - Node 1)
+
+```yaml
+# k8s/infra/postgres.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: biddy-infra
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+  clusterIP: None  # Headless Service
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: biddy-infra
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      nodeSelector:
+        workload: heavy  # Node 1에만 배포
+      containers:
+      - name: postgres
+        image: postgres:16-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: biddy-secrets
+              key: POSTGRES_USER
+              namespace: biddy-services
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: biddy-secrets
+              key: POSTGRES_PASSWORD
+              namespace: biddy-services
+        - name: POSTGRES_DB
+          value: "biddy"
+        - name: PGDATA
+          value: "/var/lib/postgresql/data/pgdata"
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        - name: init-scripts
+          mountPath: /docker-entrypoint-initdb.d
         resources:
           requests:
             memory: "512Mi"
-            cpu: "500m"
+            cpu: "250m"
           limits:
             memory: "1Gi"
-            cpu: "1000m"
+            cpu: "500m"
+      volumes:
+      - name: init-scripts
+        configMap:
+          name: postgres-init-scripts
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: local-storage
+      resources:
+        requests:
+          storage: 20Gi
 ---
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
+apiVersion: v1
+kind: ConfigMap
 metadata:
-  name: auction-hpa
-  namespace: biddy-services
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: auction
-  minReplicas: 2
-  maxReplicas: 10
-  metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
+  name: postgres-init-scripts
+  namespace: biddy-infra
+data:
+  init.sql: |
+    CREATE DATABASE biddy_member;
+    CREATE DATABASE biddy_product;
+    CREATE DATABASE biddy_order;
+    CREATE DATABASE biddy_auction;
+    CREATE DATABASE biddy_payment;
 ```
 
-### 9-4. API Gateway 배포 (ALB 연동)
+### 7-2. Redis (StatefulSet - Node 2)
 
 ```yaml
-# k8s-aws/gateway/apigateway.yaml
+# k8s/infra/redis.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: biddy-infra
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: biddy-infra
+spec:
+  serviceName: redis
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      nodeSelector:
+        workload: light  # Node 2에 배포
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: local-storage
+      resources:
+        requests:
+          storage: 5Gi
+```
+
+### 7-3. Kafka (StatefulSet - Node 1)
+
+```yaml
+# k8s/infra/kafka.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: biddy-infra
+spec:
+  selector:
+    app: kafka
+  ports:
+    - port: 9092
+      targetPort: 9092
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+  namespace: biddy-infra
+spec:
+  serviceName: kafka
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      nodeSelector:
+        workload: heavy  # Node 1에 배포
+      containers:
+      - name: kafka
+        image: apache/kafka:3.7.0
+        ports:
+        - containerPort: 9092
+        - containerPort: 9093
+        env:
+        - name: KAFKA_NODE_ID
+          value: "1"
+        - name: KAFKA_PROCESS_ROLES
+          value: "broker,controller"
+        - name: KAFKA_LISTENERS
+          value: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+        - name: KAFKA_ADVERTISED_LISTENERS
+          value: "PLAINTEXT://kafka.biddy-infra.svc.cluster.local:9092"
+        - name: KAFKA_CONTROLLER_LISTENER_NAMES
+          value: "CONTROLLER"
+        - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+          value: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+        - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+          value: "1@kafka.biddy-infra.svc.cluster.local:9093"
+        - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+          value: "1"
+        - name: CLUSTER_ID
+          value: "biddy-kafka-cluster-001"
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: kafka-data
+          mountPath: /var/lib/kafka/data
+  volumeClaimTemplates:
+  - metadata:
+      name: kafka-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: local-storage
+      resources:
+        requests:
+          storage: 15Gi
+```
+
+### 7-4. Discovery (Eureka - Node 1)
+
+```yaml
+# k8s/infra/discovery.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: discovery
+  namespace: biddy-infra
+spec:
+  selector:
+    app: discovery
+  ports:
+    - port: 8761
+      targetPort: 8761
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discovery
+  namespace: biddy-infra
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: discovery
+  template:
+    metadata:
+      labels:
+        app: discovery
+    spec:
+      nodeSelector:
+        workload: heavy
+      containers:
+      - name: discovery
+        image: your-registry/biddy-discovery:latest
+        ports:
+        - containerPort: 8761
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8761
+          initialDelaySeconds: 60
+          periodSeconds: 10
+```
+
+### 7-5. API Gateway (Node 1)
+
+```yaml
+# k8s/gateway/apigateway.yaml
 apiVersion: v1
 kind: Service
 metadata:
@@ -796,7 +1276,8 @@ spec:
   ports:
     - port: 8000
       targetPort: 8000
-  type: ClusterIP
+      nodePort: 30000  # NodePort로 외부 노출
+  type: NodePort
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -813,31 +1294,22 @@ spec:
       labels:
         app: apigateway
     spec:
+      nodeSelector:
+        workload: heavy
       containers:
       - name: apigateway
-        image: YOUR_ACCOUNT_ID.dkr.ecr.ap-northeast-2.amazonaws.com/biddy/apigateway:v1.0.0
+        image: your-registry/biddy-apigateway:latest
         ports:
         - containerPort: 8000
         env:
         - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
-          value: "http://discovery.biddy-services.svc.cluster.local:8761/eureka/"
+          value: "http://discovery.biddy-infra.svc.cluster.local:8761/eureka/"
         - name: JWT_SECRET
           valueFrom:
             secretKeyRef:
               name: biddy-secrets
               key: JWT_SECRET
-        livenessProbe:
-          httpGet:
-            path: /actuator/health
-            port: 8000
-          initialDelaySeconds: 90
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /actuator/health
-            port: 8000
-          initialDelaySeconds: 60
-          periodSeconds: 5
+              namespace: biddy-services
         resources:
           requests:
             memory: "512Mi"
@@ -845,225 +1317,130 @@ spec:
           limits:
             memory: "1Gi"
             cpu: "1000m"
-```
-
-### 9-5. Ingress (ALB 자동 생성)
-
-```yaml
-# k8s-aws/gateway/ingress.yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: biddy-ingress
-  namespace: biddy-gateway
-  annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/healthcheck-path: /actuator/health
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
-    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:ACCOUNT_ID:certificate/xxxxx  # ACM 인증서
-    alb.ingress.kubernetes.io/ssl-redirect: '443'
-spec:
-  ingressClassName: alb
-  rules:
-  - host: api.biddy.example.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: apigateway
-            port:
-              number: 8000
-```
-
-### 9-6. 배포 실행
-
-```bash
-# 네임스페이스
-kubectl apply -f k8s-aws/namespaces.yaml
-
-# ConfigMap 및 Secret
-kubectl apply -f k8s-aws/config/
-
-# 서비스 배포
-kubectl apply -f k8s-aws/services/discovery.yaml
-kubectl apply -f k8s-aws/services/config.yaml
-sleep 30
-
-# 도메인 서비스
-kubectl apply -f k8s-aws/services/member.yaml
-kubectl apply -f k8s-aws/services/product.yaml
-kubectl apply -f k8s-aws/services/order.yaml
-kubectl apply -f k8s-aws/services/auction.yaml
-kubectl apply -f k8s-aws/services/payment.yaml
-
-# Gateway
-kubectl apply -f k8s-aws/gateway/apigateway.yaml
-kubectl apply -f k8s-aws/gateway/ingress.yaml
-
-# 확인
-kubectl get pods --all-namespaces
-kubectl get svc --all-namespaces
-kubectl get ingress -n biddy-gateway
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8000
+          initialDelaySeconds: 90
+          periodSeconds: 10
 ```
 
 ---
 
-## 10. Route53 DNS 설정
+## 8. 전체 배포 순서 (AWS 담당자)
 
-### 10-1. ALB 도메인 연결
+### 8-1. 인프라 먼저 배포
 
 ```bash
-# Ingress에서 ALB DNS 확인
-kubectl get ingress -n biddy-gateway -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}'
-# 출력 예: k8s-biddygat-biddying-xxxxx.ap-northeast-2.elb.amazonaws.com
+# 1. 네임스페이스, ConfigMap, Secret
+kubectl apply -f k8s/base/
 
-# Route53에서 A 레코드 생성 (Alias)
-aws route53 change-resource-record-sets \
-  --hosted-zone-id Z1234567890ABC \
-  --change-batch '{
-    "Changes": [{
-      "Action": "CREATE",
-      "ResourceRecordSet": {
-        "Name": "api.biddy.example.com",
-        "Type": "A",
-        "AliasTarget": {
-          "HostedZoneId": "Z3W03O7B5YMIYP",
-          "DNSName": "k8s-biddygat-biddying-xxxxx.ap-northeast-2.elb.amazonaws.com",
-          "EvaluateTargetHealth": false
-        }
-      }
-    }]
-  }'
+# 2. 스토리지
+kubectl apply -f k8s/storage/
 
-# DNS 확인 (전파 시간 5~10분)
-dig api.biddy.example.com
-curl https://api.biddy.example.com/actuator/health
+# 3. PostgreSQL
+kubectl apply -f k8s/infra/postgres.yaml
+kubectl wait --for=condition=ready pod -l app=postgres -n biddy-infra --timeout=300s
+
+# 4. Redis
+kubectl apply -f k8s/infra/redis.yaml
+kubectl wait --for=condition=ready pod -l app=redis -n biddy-infra --timeout=300s
+
+# 5. Kafka
+kubectl apply -f k8s/infra/kafka.yaml
+kubectl wait --for=condition=ready pod -l app=kafka -n biddy-infra --timeout=300s
+
+# 6. Discovery
+kubectl apply -f k8s/infra/discovery.yaml
+kubectl wait --for=condition=ready pod -l app=discovery -n biddy-infra --timeout=300s
+```
+
+### 8-2. 애플리케이션 배포
+
+```bash
+# 7. API Gateway
+kubectl apply -f k8s/gateway/apigateway.yaml
+
+# 8. 도메인 서비스 (병렬 배포 가능)
+kubectl apply -f k8s/services/member.yaml
+kubectl apply -f k8s/services/product.yaml
+kubectl apply -f k8s/services/order.yaml
+kubectl apply -f k8s/services/auction.yaml
+kubectl apply -f k8s/services/payment.yaml
+
+# 9. 전체 상태 확인
+kubectl get pods --all-namespaces -o wide
 ```
 
 ---
 
-## 11. CloudWatch 모니터링
+## 9. ALB 구성 (외부 접근)
 
-### 11-1. Container Insights 활성화
-
-```bash
-# CloudWatch Agent 설치
-kubectl apply -f https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/quickstart/cwagent-fluentd-quickstart.yaml
-
-# 확인
-kubectl get pods -n amazon-cloudwatch
-```
-
-### 11-2. CloudWatch 대시보드
-
-AWS 콘솔 → CloudWatch → Container Insights에서 다음 확인:
-- Pod CPU/Memory 사용률
-- Node 리소스 사용률
-- 서비스별 요청 수 및 응답 시간
-- 로그 스트림 (Pod별)
-
----
-
-## 12. 비용 최적화
-
-### 12-1. 비용 절감 전략
-
-| 항목 | 개발 환경 | 프로덕션 환경 |
-|------|----------|-------------|
-| **EKS Worker Node** | t3.medium x 2 | t3.medium x 3~6 + Spot Instance |
-| **RDS** | db.t3.small (Single-AZ) | db.t3.medium (Multi-AZ) |
-| **ElastiCache** | cache.t3.micro | cache.t3.small (Cluster) |
-| **MSK** | kafka.t3.small x 2 | kafka.m5.large x 3 |
-| **NAT Gateway** | Single NAT | HA (Multi-AZ) |
-| **ALB** | 1개 | 1개 (충분) |
-
-### 12-2. 월별 예상 비용 (ap-northeast-2)
-
-#### 개발 환경
-```
-- EKS Control Plane: $73
-- EC2 (t3.medium x 2): $60
-- RDS (db.t3.small): $50
-- ElastiCache (cache.t3.micro): $15
-- MSK (kafka.t3.small x 2): $120
-- NAT Gateway: $32
-- ALB: $22
-- EBS (100GB): $10
-──────────────────────────
-합계: 약 $382/월
-```
-
-#### 프로덕션 환경
-```
-- EKS Control Plane: $73
-- EC2 (t3.medium x 3): $90
-- RDS (db.t3.medium, Multi-AZ): $150
-- ElastiCache (cache.t3.small, Cluster): $60
-- MSK (kafka.t3.small x 3): $180
-- NAT Gateway (HA): $64
-- ALB: $22
-- EBS (300GB): $30
-- CloudWatch: $20
-──────────────────────────
-합계: 약 $689/월
-```
-
-### 12-3. 비용 절감 팁
+### 9-1. Target Group 생성
 
 ```bash
-# Spot Instance 사용 (최대 90% 절감)
-eksctl create nodegroup \
-  --cluster biddy-eks-cluster \
-  --name biddy-spot-workers \
-  --instance-types t3.medium,t3a.medium \
-  --spot \
-  --nodes 2 \
-  --nodes-min 1 \
-  --nodes-max 5
+# API Gateway NodePort로 타겟 그룹 생성
+aws elbv2 create-target-group \
+  --name biddy-api-gateway-tg \
+  --protocol HTTP \
+  --port 30000 \
+  --vpc-id vpc-xxxxx \
+  --health-check-path /actuator/health \
+  --health-check-interval-seconds 30
 
-# RDS 예약 인스턴스 (1년 약정 시 40% 절감)
-# ElastiCache 예약 노드 (1년 약정 시 30% 절감)
+# 노드 등록
+aws elbv2 register-targets \
+  --target-group-arn arn:aws:elasticloadbalancing:... \
+  --targets Id=i-master-instance-id Id=i-worker-instance-id
+```
 
-# MSK 대신 자체 Kafka StatefulSet 사용 (개발 환경)
-# - 월 $120 절감
+### 9-2. Application Load Balancer 생성
 
-# NAT Gateway 대신 NAT Instance (비추천, 관리 복잡)
+```bash
+aws elbv2 create-load-balancer \
+  --name biddy-alb \
+  --subnets subnet-public-1 subnet-public-2 \
+  --security-groups sg-alb \
+  --scheme internet-facing
+
+# 리스너 추가
+aws elbv2 create-listener \
+  --load-balancer-arn arn:aws:elasticloadbalancing:... \
+  --protocol HTTP \
+  --port 80 \
+  --default-actions Type=forward,TargetGroupArn=arn:...
 ```
 
 ---
 
-## 13. 운영 가이드
+## 10. 운영 가이드
 
-### 13-1. 클러스터 스케일링
+### 10-1. 모니터링
 
 ```bash
-# Worker Node 수동 스케일링
-eksctl scale nodegroup \
-  --cluster biddy-eks-cluster \
-  --name biddy-workers \
-  --nodes 5
+# 노드 리소스 확인
+kubectl top nodes
 
-# Cluster Autoscaler 설치 (자동 스케일링)
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/autoscaler/master/cluster-autoscaler/cloudprovider/aws/examples/cluster-autoscaler-autodiscover.yaml
+# Pod 리소스 확인
+kubectl top pods --all-namespaces
 
-# 설정 수정
-kubectl -n kube-system edit deployment cluster-autoscaler
-# --node-group-auto-discovery=asg:tag=k8s.io/cluster-autoscaler/enabled,k8s.io/cluster-autoscaler/biddy-eks-cluster
+# 특정 서비스 로그
+kubectl logs -f deployment/auction -n biddy-services
+
+# 이벤트 확인
+kubectl get events -n biddy-services --sort-by='.lastTimestamp'
 ```
 
-### 13-2. 롤링 업데이트
+### 10-2. 서비스 업데이트 (도메인 담당자)
 
 ```bash
-# 새 이미지 빌드 및 푸시
-docker build -t $ECR_REGISTRY/biddy/auction:v1.1.0 ./auction
-docker push $ECR_REGISTRY/biddy/auction:v1.1.0
+# 이미지 빌드 및 푸시
+docker build -t your-registry/biddy-auction:v1.1.0 ./auction
+docker push your-registry/biddy-auction:v1.1.0
 
 # Deployment 이미지 업데이트
 kubectl set image deployment/auction \
-  auction=$ECR_REGISTRY/biddy/auction:v1.1.0 \
+  auction=your-registry/biddy-auction:v1.1.0 \
   -n biddy-services
 
 # 롤아웃 상태 확인
@@ -1073,243 +1450,140 @@ kubectl rollout status deployment/auction -n biddy-services
 kubectl rollout undo deployment/auction -n biddy-services
 ```
 
-### 13-3. RDS 백업 및 복구
+### 10-3. 스케일링
 
 ```bash
-# 수동 스냅샷 생성
-aws rds create-db-snapshot \
-  --db-instance-identifier biddy-postgres \
-  --db-snapshot-identifier biddy-postgres-snapshot-$(date +%Y%m%d)
+# 수동 스케일링
+kubectl scale deployment auction --replicas=3 -n biddy-services
 
-# 스냅샷에서 복구
-aws rds restore-db-instance-from-db-snapshot \
-  --db-instance-identifier biddy-postgres-restored \
-  --db-snapshot-identifier biddy-postgres-snapshot-20260702
-
-# 자동 백업 확인
-aws rds describe-db-snapshots \
-  --db-instance-identifier biddy-postgres
+# 확인
+kubectl get pods -n biddy-services -l app=auction -o wide
 ```
 
-### 13-4. 로그 확인
+### 10-4. 디버깅
 
 ```bash
-# Pod 로그
-kubectl logs -f deployment/auction -n biddy-services
+# Pod 내부 접속
+kubectl exec -it <pod-name> -n biddy-services -- /bin/bash
 
-# CloudWatch Logs Insights 쿼리
-# AWS 콘솔 → CloudWatch → Logs Insights
-fields @timestamp, @message
-| filter kubernetes.namespace_name = "biddy-services"
-| filter kubernetes.container_name = "auction"
-| filter @message like /ERROR/
-| sort @timestamp desc
-| limit 100
-```
+# 포트포워딩 (로컬 테스트)
+kubectl port-forward svc/auction 8084:8084 -n biddy-services
 
----
-
-## 14. 보안 설정
-
-### 14-1. IAM Role for Service Account (IRSA)
-
-```bash
-# S3 접근 권한이 필요한 경우 (이미지 업로드)
-eksctl create iamserviceaccount \
-  --name product-sa \
-  --namespace biddy-services \
-  --cluster biddy-eks-cluster \
-  --attach-policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess \
-  --approve
-
-# Deployment에 ServiceAccount 추가
-spec:
-  template:
-    spec:
-      serviceAccountName: product-sa
-```
-
-### 14-2. Network Policy
-
-```yaml
-# k8s-aws/network-policy.yaml
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-from-gateway
-  namespace: biddy-services
-spec:
-  podSelector:
-    matchLabels:
-      app: auction
-  policyTypes:
-  - Ingress
-  ingress:
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          name: biddy-gateway
-    ports:
-    - protocol: TCP
-      port: 8084
-```
-
-### 14-3. Secret 암호화 (KMS)
-
-```bash
-# KMS 키 생성
-aws kms create-key --description "EKS Secret Encryption"
-
-# EKS 클러스터에 암호화 적용
-aws eks associate-encryption-config \
-  --cluster-name biddy-eks-cluster \
-  --encryption-config '[{"resources":["secrets"],"provider":{"keyArn":"arn:aws:kms:ap-northeast-2:ACCOUNT_ID:key/xxxxx"}}]'
-```
-
----
-
-## 15. 트러블슈팅
-
-### 15-1. Pod가 Pending 상태
-
-```bash
-# 이유 확인
+# Pod 상세 정보
 kubectl describe pod <pod-name> -n biddy-services
-# 원인: Insufficient CPU/Memory, Node Selector 불일치
-
-# 해결: Worker Node 추가 또는 리소스 제한 조정
-eksctl scale nodegroup --cluster biddy-eks-cluster --name biddy-workers --nodes 5
 ```
 
-### 15-2. RDS 연결 실패
+---
+
+## 11. 비용 최적화
+
+### 11-1. 월별 예상 비용
+
+```
+- EC2 t3.large (마스터+워커): $60/월
+- EC2 t3.medium (워커): $30/월
+- EBS 50GB + 30GB: $8/월
+- ALB: $22/월
+- 데이터 전송: $10/월
+─────────────────────────
+합계: 약 $130/월
+```
+
+### 11-2. 비용 절감 팁
+
+1. **Spot Instance 활용** (워커 노드만)
+   - t3.medium 워커를 Spot으로 전환 → 70% 절감
+
+2. **예약 인스턴스** (1년 약정)
+   - t3.large 1년 약정 → 40% 절감
+
+3. **EBS 최적화**
+   - gp3 사용 (gp2 대비 20% 저렴)
+
+---
+
+## 12. 추가 권장사항
+
+### 12-1. 필수 추가 작업
+
+1. **Metrics Server 설치** (HPA 사용 시)
+```bash
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+```
+
+2. **Ingress Controller 설치** (선택사항)
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/aws/deploy.yaml
+```
+
+3. **Prometheus + Grafana** (모니터링)
+```bash
+# Helm으로 설치
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm install prometheus prometheus-community/kube-prometheus-stack -n monitoring --create-namespace
+```
+
+### 12-2. 백업 전략
 
 ```bash
-# Security Group 확인
-aws ec2 describe-security-groups --group-ids sg-xxxxx
+# PostgreSQL 백업 (CronJob)
+kubectl apply -f k8s/jobs/postgres-backup-cronjob.yaml
 
-# EKS Worker Node SG 확인
-kubectl get nodes -o jsonpath='{.items[0].spec.providerID}' | cut -d'/' -f5
-aws ec2 describe-instances --instance-ids i-xxxxx --query 'Reservations[0].Instances[0].SecurityGroups'
-
-# RDS SG에 EKS Worker Node SG 추가
-aws ec2 authorize-security-group-ingress \
-  --group-id <rds-sg> \
-  --protocol tcp \
-  --port 5432 \
-  --source-group <eks-worker-sg>
+# etcd 백업 (마스터 노드)
+sudo ETCDCTL_API=3 etcdctl snapshot save /backup/etcd-$(date +%Y%m%d).db \
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key
 ```
 
-### 15-3. ALB Health Check 실패
+---
+
+## 13. 트러블슈팅
+
+### 13-1. Pod가 Pending 상태
 
 ```bash
-# Target Group 확인
-aws elbv2 describe-target-health --target-group-arn <tg-arn>
+# 원인 확인
+kubectl describe pod <pod-name> -n biddy-services
 
-# Health Check 경로 확인
-kubectl get ingress -n biddy-gateway -o yaml
-# alb.ingress.kubernetes.io/healthcheck-path: /actuator/health
-
-# Pod Health Check 확인
-kubectl get pods -n biddy-gateway -o yaml | grep -A5 readinessProbe
+# 일반적 원인:
+# 1. 리소스 부족 → 노드 스케일링 또는 리소스 제한 조정
+# 2. PV 없음 → PV 생성 확인
+# 3. NodeSelector 불일치 → 라벨 확인
 ```
 
----
-
-## 16. CI/CD with GitHub Actions
-
-```yaml
-# .github/workflows/deploy-eks.yml
-name: Deploy to AWS EKS
-
-on:
-  push:
-    branches: [main]
-
-env:
-  AWS_REGION: ap-northeast-2
-  ECR_REGISTRY: YOUR_ACCOUNT_ID.dkr.ecr.ap-northeast-2.amazonaws.com
-  EKS_CLUSTER: biddy-eks-cluster
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v2
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
-
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
-
-    - name: Build and push Docker images
-      run: |
-        ./gradlew clean build -x test
-
-        docker build -t $ECR_REGISTRY/biddy/auction:${{ github.sha }} ./auction
-        docker push $ECR_REGISTRY/biddy/auction:${{ github.sha }}
-
-        docker tag $ECR_REGISTRY/biddy/auction:${{ github.sha }} $ECR_REGISTRY/biddy/auction:latest
-        docker push $ECR_REGISTRY/biddy/auction:latest
-
-    - name: Update kubeconfig
-      run: |
-        aws eks update-kubeconfig --name $EKS_CLUSTER --region $AWS_REGION
-
-    - name: Deploy to EKS
-      run: |
-        kubectl set image deployment/auction \
-          auction=$ECR_REGISTRY/biddy/auction:${{ github.sha }} \
-          -n biddy-services
-
-        kubectl rollout status deployment/auction -n biddy-services
-```
-
----
-
-## 17. 클러스터 삭제
+### 13-2. 노드 간 통신 실패
 
 ```bash
-# EKS 클러스터 삭제 (모든 리소스 삭제)
-eksctl delete cluster --name biddy-eks-cluster --region ap-northeast-2
+# CNI 플러그인 확인
+kubectl get pods -n kube-system -l k8s-app=calico-node
 
-# RDS 삭제
-aws rds delete-db-instance \
-  --db-instance-identifier biddy-postgres \
-  --skip-final-snapshot
+# 재시작
+kubectl delete pod -n kube-system -l k8s-app=calico-node
+```
 
-# ElastiCache 삭제
-aws elasticache delete-replication-group \
-  --replication-group-id biddy-redis \
-  --no-retain-primary-cluster
+### 13-3. 서비스 디스커버리 실패
 
-# MSK 삭제
-aws kafka delete-cluster --cluster-arn <cluster-arn>
+```bash
+# DNS 확인
+kubectl run -it --rm debug --image=busybox --restart=Never -- nslookup auction.biddy-services.svc.cluster.local
 
-# ECR 이미지 삭제
-for repo in discovery config apigateway member product order auction payment; do
-  aws ecr delete-repository --repository-name biddy/$repo --force
-done
+# CoreDNS 확인
+kubectl get pods -n kube-system -l k8s-app=kube-dns
 ```
 
 ---
 
-## 18. 참고 자료
+## 14. 참고 자료
 
-- [AWS EKS 공식 문서](https://docs.aws.amazon.com/eks/)
-- [eksctl 공식 문서](https://eksctl.io/)
-- [AWS Load Balancer Controller](https://kubernetes-sigs.github.io/aws-load-balancer-controller/)
-- [RDS Best Practices](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_BestPractices.html)
-- [MSK Developer Guide](https://docs.aws.amazon.com/msk/latest/developerguide/what-is-msk.html)
-- [EKS Workshop](https://www.eksworkshop.com/)
+- [Kubernetes 공식 문서](https://kubernetes.io/docs/)
+- [kubeadm 설치 가이드](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/)
+- [Calico CNI](https://docs.projectcalico.org/)
+- [AWS ALB 설정](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/)
 
 ---
 
-**문서 버전**: 1.0
-**최종 수정일**: 2026-07-02
+**문서 버전**: 2.0
+**최종 수정일**: 2026-07-07
 **작성자**: Biddy Dev Team
