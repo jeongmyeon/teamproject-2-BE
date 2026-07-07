@@ -1,4 +1,4 @@
-# Biddy MSA Kubernetes 도입 가이드
+오# Biddy MSA Kubernetes 도입 가이드
 
 ## 문서 정보
 - **프로젝트**: Biddy 실시간 경매 플랫폼

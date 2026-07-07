@@ -15,4 +15,7 @@
 .DS_Store
 Thumbs.db
 
+# Kubernetes AWS deployment files (local only)
+k8s-aws/
+
 
