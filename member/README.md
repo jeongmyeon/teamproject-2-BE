@@ -16,3 +16,6 @@ These additional references should also help you:
 
 ---
 * CI/CD 파이프라인(GHCR) 동작 테스트를 위한 업데이트입니다.
+* Develop 브랜치 Merge 후 재테스트를 위한 두 번째 업데이트입니다.
+
+* Develop 브랜치 Merge 후 전체 재테스트를 위한 업데이트입니다.
