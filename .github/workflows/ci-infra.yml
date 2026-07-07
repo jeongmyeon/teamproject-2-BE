@@ -24,6 +24,9 @@ jobs:
   detect-changes:
     name: Detect Changes
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     outputs:
       apigateway: ${{ steps.filter.outputs.apigateway }}
       config: ${{ steps.filter.outputs.config }}
@@ -44,6 +47,9 @@ jobs:
   build:
     name: Build ${{ matrix.service }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     needs: detect-changes
     strategy:
       fail-fast: false
@@ -84,3 +90,19 @@ jobs:
         if: matrix.changed == 'true'
         working-directory: ${{ matrix.service }}
         run: ./gradlew build --no-daemon
+
+      - name: Login to GitHub Container Registry
+        if: matrix.changed == 'true' && github.event_name == 'push' && success()
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Docker image
+        if: matrix.changed == 'true' && github.event_name == 'push' && success()
+        run: |
+          cd ${{ matrix.service }}
+          docker build -t ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}:latest -t ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}:${{ github.sha }} .
+          docker push ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}:latest
+          docker push ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}:${{ github.sha }}
