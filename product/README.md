@@ -18,3 +18,5 @@ These additional references should also help you:
 * Develop 브랜치 Merge 후 전체 재테스트를 위한 업데이트입니다.
 
 * 전체 도메인 이미지 생성을 위한 강제 트리거
+
+* 마지막 전체 CI/CD 동작 확인을 위한 테스트 업데이트
