@@ -17,5 +17,6 @@ These additional references should also help you:
 ---
 * CI/CD 파이프라인(GHCR) 동작 테스트를 위한 업데이트입니다.
 * Develop 브랜치 Merge 후 재테스트를 위한 두 번째 업데이트입니다.
+* EC2_HOST 갱신 및 deploy.yml 배포 에러 해결 후 최종 파이프라인(CI/CD) 풀코스 테스트를 위한 세 번째 업데이트입니다!
 
 * Develop 브랜치 Merge 후 전체 재테스트를 위한 업데이트입니다.
