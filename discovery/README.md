@@ -14,3 +14,5 @@ These additional references should also help you:
 
 * [Gradle Build Scans – insights for your project's build](https://scans.gradle.com#gradle)
 
+
+* Develop 브랜치 Merge 후 전체 재테스트를 위한 업데이트입니다.
