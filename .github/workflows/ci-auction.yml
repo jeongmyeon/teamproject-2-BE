@@ -101,6 +101,6 @@ jobs:
         if: github.event_name == 'push' && success()
         run: |
           cd auction
-          docker build -t ghcr.io/${{ github.repository_owner }}/auction:latest -t ghcr.io/${{ github.repository_owner }}/auction:${{ github.sha }} .
-          docker push ghcr.io/${{ github.repository_owner }}/auction:latest
-          docker push ghcr.io/${{ github.repository_owner }}/auction:${{ github.sha }}
+          docker build -t ghcr.io/${{ github.repository_owner }}/frontal-auction:latest -t ghcr.io/${{ github.repository_owner }}/frontal-auction:${{ github.sha }} .
+          docker push ghcr.io/${{ github.repository_owner }}/frontal-auction:latest
+          docker push ghcr.io/${{ github.repository_owner }}/frontal-auction:${{ github.sha }}

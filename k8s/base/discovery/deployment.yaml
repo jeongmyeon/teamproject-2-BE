@@ -16,7 +16,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: discovery
-          image: ghcr.io/prgrms-be-adv-devcourse/discovery:latest
+          image: ghcr.io/prgrms-be-adv-devcourse/frontal-discovery:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8761

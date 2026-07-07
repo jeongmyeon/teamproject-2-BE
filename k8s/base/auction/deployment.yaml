@@ -16,7 +16,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: auction
-          image: ghcr.io/prgrms-be-adv-devcourse/auction:latest
+          image: ghcr.io/prgrms-be-adv-devcourse/frontal-auction:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8084
