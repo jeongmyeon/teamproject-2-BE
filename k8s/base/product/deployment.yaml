@@ -16,7 +16,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: product
-          image: ghcr.io/prgrms-be-adv-devcourse/product:latest
+          image: ghcr.io/prgrms-be-adv-devcourse/frontal-product:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8082

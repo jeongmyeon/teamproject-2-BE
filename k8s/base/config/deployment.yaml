@@ -16,7 +16,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: config
-          image: ghcr.io/prgrms-be-adv-devcourse/config:latest
+          image: ghcr.io/prgrms-be-adv-devcourse/frontal-config:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8888

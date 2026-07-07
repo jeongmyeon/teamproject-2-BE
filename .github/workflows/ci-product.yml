@@ -67,6 +67,6 @@ jobs:
         if: github.event_name == 'push' && success()
         run: |
           cd product
-          docker build -t ghcr.io/${{ github.repository_owner }}/product:latest -t ghcr.io/${{ github.repository_owner }}/product:${{ github.sha }} .
-          docker push ghcr.io/${{ github.repository_owner }}/product:latest
-          docker push ghcr.io/${{ github.repository_owner }}/product:${{ github.sha }}
+          docker build -t ghcr.io/${{ github.repository_owner }}/frontal-product:latest -t ghcr.io/${{ github.repository_owner }}/frontal-product:${{ github.sha }} .
+          docker push ghcr.io/${{ github.repository_owner }}/frontal-product:latest
+          docker push ghcr.io/${{ github.repository_owner }}/frontal-product:${{ github.sha }}
