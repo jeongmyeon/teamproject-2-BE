@@ -14,3 +14,5 @@ These additional references should also help you:
 
 * [Gradle Build Scans – insights for your project's build](https://scans.gradle.com#gradle)
 
+---
+* CI/CD 파이프라인(GHCR) 동작 테스트를 위한 업데이트입니다.
