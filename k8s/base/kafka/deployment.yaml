@@ -32,15 +32,15 @@ spec:
             - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
               value: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
             - name: KAFKA_CONTROLLER_QUORUM_VOTERS
-              value: 1@kafka:9093
+              value: 1@localhost:9093
             - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
               value: "1"
             - name: CLUSTER_ID
               value: biddy-kafka-cluster-001
           readinessProbe:
-            exec:
-              command: ["/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"]
+            tcpSocket:
+              port: 9092
             initialDelaySeconds: 30
-            periodSeconds: 15
-            timeoutSeconds: 10
-
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
