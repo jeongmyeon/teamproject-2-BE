@@ -31,4 +31,5 @@ spec:
               port: 8085
             initialDelaySeconds: 45
             periodSeconds: 10
+            timeoutSeconds: 5
 

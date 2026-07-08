@@ -22,4 +22,5 @@ spec:
               command: ["redis-cli", "ping"]
             initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 5
 
