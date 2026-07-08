@@ -15,8 +15,8 @@ resources:
   - kafka/service.yaml
   - discovery/deployment.yaml
   - discovery/service.yaml
-#  - config/deployment.yaml
-#  - config/service.yaml
+  - config/deployment.yaml
+  - config/service.yaml
   - apigateway/deployment.yaml
   - apigateway/service.yaml
   - member/deployment.yaml
