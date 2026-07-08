@@ -11,6 +11,10 @@ spec:
     metadata:
       labels:
         app: auction
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8084"
+        prometheus.io/path: "/actuator/prometheus"
     spec:
       imagePullSecrets:
         - name: ghcr-secret

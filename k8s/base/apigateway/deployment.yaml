@@ -11,6 +11,10 @@ spec:
     metadata:
       labels:
         app: apigateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/actuator/prometheus"
     spec:
       nodeSelector:
         node-role.kubernetes.io/control-plane: ""

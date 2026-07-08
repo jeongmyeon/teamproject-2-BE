@@ -11,6 +11,10 @@ spec:
     metadata:
       labels:
         app: config
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8888"
+        prometheus.io/path: "/actuator/prometheus"
     spec:
       nodeSelector:
         node-role.kubernetes.io/control-plane: ""
