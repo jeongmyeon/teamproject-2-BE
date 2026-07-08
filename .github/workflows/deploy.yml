@@ -66,6 +66,12 @@ jobs:
             export KUBECONFIG=~/.kube/config
             NAMESPACE=biddy
 
+            echo "Pulling latest kubernetes manifests from git..."
+            cd ~/beadv6_6_frontal_BE
+            git checkout develop
+            git pull origin develop
+            kubectl apply -k k8s/base
+
             for deployment in $DEPLOYMENTS; do
               echo "Deploying and waiting for ${deployment} to become ready..."
               kubectl rollout restart "deployment/${deployment}" -n "$NAMESPACE"
