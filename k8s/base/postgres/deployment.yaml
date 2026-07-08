@@ -27,6 +27,7 @@ spec:
               command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\""]
             initialDelaySeconds: 10
             periodSeconds: 10
+            timeoutSeconds: 5
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data

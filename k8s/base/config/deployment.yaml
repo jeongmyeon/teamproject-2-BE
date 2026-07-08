@@ -29,4 +29,5 @@ spec:
               port: 8888
             initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 5
 
