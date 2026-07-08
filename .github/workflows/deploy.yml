@@ -42,13 +42,13 @@ jobs:
               "CI - Order") DEPLOYMENTS="order" ;;
               "CI - Auction") DEPLOYMENTS="auction" ;;
               "CI - Payment") DEPLOYMENTS="payment" ;;
-              "CI - Infra") DEPLOYMENTS="apigateway config discovery" ;;
+              "CI - Infra") DEPLOYMENTS="apigateway discovery" ;;
               *) DEPLOYMENTS="" ;;
             esac
           fi
 
           if [ "$DEPLOYMENTS" = "all" ]; then
-            DEPLOYMENTS="config discovery apigateway member product order auction payment"
+            DEPLOYMENTS="discovery apigateway member product order auction payment"
           fi
 
           echo "deployments=$DEPLOYMENTS" >> "$GITHUB_OUTPUT"
