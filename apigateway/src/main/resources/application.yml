@@ -68,7 +68,11 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, info, gateway
+        include: health, info, gateway, metrics, prometheus
+  metrics:
+    export:
+      prometheus:
+        enabled: true
 
 
 jwt:
