@@ -1,0 +1,39 @@
+# Let's Encrypt ClusterIssuer 설정
+#
+# 사용 순서:
+#   1. letsencrypt-staging 으로 먼저 테스트 (실패해도 rate limit 걱정 없음)
+#   2. 정상 발급 확인되면 ingress.yaml의 annotation을
+#      "letsencrypt-staging" -> "letsencrypt-prod" 로 변경
+#
+# HTTP-01 challenge를 쓰기 때문에, 도메인의 DNS가 반드시
+# 이 클러스터의 ingress(ALB)를 가리키고 있어야 발급이 성공한다.
+
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: tlsdlcl456@gmail.com   # TODO: 필요하면 다른 이메일로 변경
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: tlsdlcl456@gmail.com   # TODO: 필요하면 다른 이메일로 변경
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx
