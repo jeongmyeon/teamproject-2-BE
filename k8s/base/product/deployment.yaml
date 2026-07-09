@@ -22,6 +22,13 @@ spec:
         - name: product
           image: ghcr.io/prgrms-be-adv-devcourse/frontal-product:latest
           imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
           ports:
             - containerPort: 8082
           envFrom:
@@ -29,9 +36,6 @@ spec:
                 name: biddy-common-config
             - secretRef:
                 name: biddy-secret
-          volumeMounts:
-            - name: product-images
-              mountPath: /app/images
           readinessProbe:
             httpGet:
               path: /actuator/health
@@ -39,7 +43,4 @@ spec:
             initialDelaySeconds: 45
             periodSeconds: 10
             timeoutSeconds: 5
-      volumes:
-        - name: product-images
-          emptyDir: {}
 
