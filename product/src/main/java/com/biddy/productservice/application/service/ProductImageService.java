@@ -34,7 +34,7 @@ public class ProductImageService {
                 .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
 
         List<String> savedUrls = files.stream().map(file -> {
-            String fileName = "product-images/" + UUID.randomUUID() + "_" + file.getOriginalFilename();
+            String fileName = "product-images/" + UUID.randomUUID() + extension(file.getOriginalFilename());
             try {
                 s3Client.putObject(
                         PutObjectRequest.builder()
@@ -54,5 +54,12 @@ public class ProductImageService {
         productRepository.save(product);
 
         return savedUrls;
+    }
+
+    private String extension(String originalFilename) {
+        if (originalFilename == null || !originalFilename.contains(".")) {
+            return "";
+        }
+        return originalFilename.substring(originalFilename.lastIndexOf("."));
     }
 }
