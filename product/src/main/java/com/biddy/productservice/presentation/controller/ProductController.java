@@ -111,6 +111,15 @@ public class ProductController {
         return ResponseEntity.status(HttpStatus.CREATED).body(urls);
     }
 
+    @DeleteMapping("/{id}/images")
+    @Operation(summary = "상품 이미지 삭제", description = "상품 이미지를 하나 삭제합니다.")
+    public ResponseEntity<Void> deleteImage(
+            @PathVariable Long id,
+            @RequestParam("url") String url) {
+        productImageService.deleteImage(id, url);
+        return ResponseEntity.noContent().build();
+    }
+
     // ── 찜하기 ──────────────────────────────────────────────
 
     @PostMapping("/{id}/like")

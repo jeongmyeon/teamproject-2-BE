@@ -176,6 +176,12 @@ public class Product {
         }
         this.imageUrls.addAll(urls);
     }
+
+    public void removeImageUrl(String url) {
+        if (!this.imageUrls.remove(url)) {
+            throw new IllegalArgumentException("해당 이미지가 상품에 등록되어 있지 않습니다.");
+        }
+    }
     @PrePersist
     public void onCreate(){
         if (regDt == null) { regDt = LocalDateTime.now();}
