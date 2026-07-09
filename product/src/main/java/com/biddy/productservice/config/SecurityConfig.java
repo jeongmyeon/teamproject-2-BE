@@ -27,8 +27,9 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // 이미지 파일은 누구나 접근 가능
+                        // 이미지 파일 및 헬스 체크는 누구나 접근 가능
                         .requestMatchers(HttpMethod.GET, "/images/**").permitAll()
+                        .requestMatchers("/actuator/health").permitAll()
                         // 로그인 필요한 GET (내 찜 목록)
                         .requestMatchers(HttpMethod.GET, "/api/products/liked").authenticated()
                         // 비로그인도 가능한 상품 조회
@@ -44,7 +45,12 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://127.0.0.1:5173", "http://localhost:5173", "https://biddy-zeta.vercel.app", "https://*.vercel.app"));
+        config.setAllowedOriginPatterns(List.of(
+                "http://localhost:*",
+                "http://127.0.0.1:*",
+                "https://biddy-zeta.vercel.app",
+                "https://*.vercel.app"
+        ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

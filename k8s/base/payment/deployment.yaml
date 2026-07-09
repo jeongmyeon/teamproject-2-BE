@@ -11,6 +11,10 @@ spec:
     metadata:
       labels:
         app: payment
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8085"
+        prometheus.io/path: "/actuator/prometheus"
     spec:
       imagePullSecrets:
         - name: ghcr-secret
@@ -31,4 +35,5 @@ spec:
               port: 8085
             initialDelaySeconds: 45
             periodSeconds: 10
+            timeoutSeconds: 5
 

@@ -103,6 +103,6 @@ jobs:
         if: matrix.changed == 'true' && github.event_name == 'push' && success()
         run: |
           cd ${{ matrix.service }}
-          docker build -t ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}:latest -t ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}:${{ github.sha }} .
-          docker push ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}:latest
-          docker push ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}:${{ github.sha }}
+          docker build -t ghcr.io/${{ github.repository_owner }}/frontal-${{ matrix.service }}:latest -t ghcr.io/${{ github.repository_owner }}/frontal-${{ matrix.service }}:${{ github.sha }} .
+          docker push ghcr.io/${{ github.repository_owner }}/frontal-${{ matrix.service }}:latest
+          docker push ghcr.io/${{ github.repository_owner }}/frontal-${{ matrix.service }}:${{ github.sha }}

@@ -11,12 +11,25 @@ spec:
     metadata:
       labels:
         app: apigateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/actuator/prometheus"
     spec:
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+        - key: "node-role.kubernetes.io/control-plane"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - key: "node-role.kubernetes.io/master"
+          operator: "Exists"
+          effect: "NoSchedule"
       imagePullSecrets:
         - name: ghcr-secret
       containers:
         - name: apigateway
-          image: ghcr.io/prgrms-be-adv-devcourse/apigateway:latest
+          image: ghcr.io/prgrms-be-adv-devcourse/frontal-apigateway:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
@@ -31,4 +44,5 @@ spec:
               port: 8000
             initialDelaySeconds: 45
             periodSeconds: 10
+            timeoutSeconds: 5
 

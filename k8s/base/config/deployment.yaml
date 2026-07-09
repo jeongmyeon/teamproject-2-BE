@@ -11,12 +11,25 @@ spec:
     metadata:
       labels:
         app: config
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8888"
+        prometheus.io/path: "/actuator/prometheus"
     spec:
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+        - key: "node-role.kubernetes.io/control-plane"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - key: "node-role.kubernetes.io/master"
+          operator: "Exists"
+          effect: "NoSchedule"
       imagePullSecrets:
         - name: ghcr-secret
       containers:
         - name: config
-          image: ghcr.io/prgrms-be-adv-devcourse/config:latest
+          image: ghcr.io/prgrms-be-adv-devcourse/frontal-config:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8888
@@ -29,4 +42,5 @@ spec:
               port: 8888
             initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 5
 

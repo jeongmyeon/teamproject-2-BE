@@ -20,3 +20,11 @@ These additional references should also help you:
 * EC2_HOST 갱신 및 deploy.yml 배포 에러 해결 후 최종 파이프라인(CI/CD) 풀코스 테스트를 위한 세 번째 업데이트입니다!
 
 * Develop 브랜치 Merge 후 전체 재테스트를 위한 업데이트입니다.
+
+* 전체 도메인 이미지 생성을 위한 강제 트리거
+
+* 마지막 전체 CI/CD 동작 확인을 위한 테스트 업데이트
+
+* 파이프라인 최종 성공 여부 확인용 테스트 커밋
+
+* 워커 노드 재부팅 후 member 서비스 단독 테스트 커밋

@@ -42,13 +42,13 @@ jobs:
               "CI - Order") DEPLOYMENTS="order" ;;
               "CI - Auction") DEPLOYMENTS="auction" ;;
               "CI - Payment") DEPLOYMENTS="payment" ;;
-              "CI - Infra") DEPLOYMENTS="apigateway config discovery" ;;
+              "CI - Infra") DEPLOYMENTS="config apigateway discovery" ;;
               *) DEPLOYMENTS="" ;;
             esac
           fi
 
           if [ "$DEPLOYMENTS" = "all" ]; then
-            DEPLOYMENTS="apigateway config discovery member product order auction payment"
+            DEPLOYMENTS="config discovery apigateway member product order auction payment"
           fi
 
           echo "deployments=$DEPLOYMENTS" >> "$GITHUB_OUTPUT"
@@ -66,12 +66,16 @@ jobs:
             export KUBECONFIG=~/.kube/config
             NAMESPACE=biddy
 
-            for deployment in $DEPLOYMENTS; do
-              kubectl rollout restart "deployment/${deployment}" -n "$NAMESPACE"
-            done
+            echo "Pulling latest kubernetes manifests from git..."
+            cd ~/beadv6_6_frontal_BE
+            git checkout develop
+            git pull origin develop
+            kubectl apply -k k8s/base
 
             for deployment in $DEPLOYMENTS; do
-              kubectl rollout status "deployment/${deployment}" -n "$NAMESPACE" --timeout=180s
+              echo "Deploying and waiting for ${deployment} to become ready..."
+              kubectl rollout restart "deployment/${deployment}" -n "$NAMESPACE"
+              kubectl rollout status "deployment/${deployment}" -n "$NAMESPACE" --timeout=600s
             done
         env:
           DEPLOYMENTS: ${{ steps.select.outputs.deployments }}

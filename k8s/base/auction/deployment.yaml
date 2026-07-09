@@ -11,12 +11,16 @@ spec:
     metadata:
       labels:
         app: auction
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8084"
+        prometheus.io/path: "/actuator/prometheus"
     spec:
       imagePullSecrets:
         - name: ghcr-secret
       containers:
         - name: auction
-          image: ghcr.io/prgrms-be-adv-devcourse/auction:latest
+          image: ghcr.io/prgrms-be-adv-devcourse/frontal-auction:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8084
@@ -31,4 +35,5 @@ spec:
               port: 8084
             initialDelaySeconds: 45
             periodSeconds: 10
+            timeoutSeconds: 5
 

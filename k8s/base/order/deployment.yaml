@@ -11,12 +11,16 @@ spec:
     metadata:
       labels:
         app: order
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8083"
+        prometheus.io/path: "/actuator/prometheus"
     spec:
       imagePullSecrets:
         - name: ghcr-secret
       containers:
         - name: order
-          image: ghcr.io/prgrms-be-adv-devcourse/order:latest
+          image: ghcr.io/prgrms-be-adv-devcourse/frontal-order:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8083
@@ -31,4 +35,5 @@ spec:
               port: 8083
             initialDelaySeconds: 45
             periodSeconds: 10
+            timeoutSeconds: 5
 

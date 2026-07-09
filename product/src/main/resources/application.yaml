@@ -40,6 +40,16 @@ eureka:
   instance:
     prefer-ip-address: true
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
 image:
   base:
     url: ${IMAGE_BASE_URL:http://localhost:8082/images}

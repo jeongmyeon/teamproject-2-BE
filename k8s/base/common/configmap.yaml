@@ -24,4 +24,3 @@ data:
   IMAGE_BASE_URL: https://team03-biddy-storage.s3.ap-northeast-2.amazonaws.com
   AWS_S3_BUCKET: team03-biddy-storage
   AWS_S3_REGION: ap-northeast-2
-

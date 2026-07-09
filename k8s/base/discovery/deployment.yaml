@@ -11,12 +11,25 @@ spec:
     metadata:
       labels:
         app: discovery
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8761"
+        prometheus.io/path: "/actuator/prometheus"
     spec:
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+        - key: "node-role.kubernetes.io/control-plane"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - key: "node-role.kubernetes.io/master"
+          operator: "Exists"
+          effect: "NoSchedule"
       imagePullSecrets:
         - name: ghcr-secret
       containers:
         - name: discovery
-          image: ghcr.io/prgrms-be-adv-devcourse/discovery:latest
+          image: ghcr.io/prgrms-be-adv-devcourse/frontal-discovery:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8761
@@ -26,4 +39,5 @@ spec:
               port: 8761
             initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 5
 

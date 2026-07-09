@@ -35,6 +35,16 @@ eureka:
   instance:
     prefer-ip-address: true
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
 biddy:
   client:
     order-service-url: ${ORDER_SERVICE_URL:http://localhost:8083}
