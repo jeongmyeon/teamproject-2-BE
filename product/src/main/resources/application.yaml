@@ -41,7 +41,10 @@ eureka:
     prefer-ip-address: true
 
 image:
-  upload:
-    path: ${IMAGE_UPLOAD_PATH:/app/images}
   base:
     url: ${IMAGE_BASE_URL:http://localhost:8082/images}
+
+aws:
+  s3:
+    bucket: ${AWS_S3_BUCKET:team03-biddy-storage}
+    region: ${AWS_S3_REGION:ap-northeast-2}
