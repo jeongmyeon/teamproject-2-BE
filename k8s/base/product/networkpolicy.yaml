@@ -1,0 +1,22 @@
+# product는 apigateway뿐 아니라 order(장바구니에서 상품 상세 조회 시 직접 호출)도 허용
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: product-allow-apigateway-and-order
+spec:
+  podSelector:
+    matchLabels:
+      app: product
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: apigateway
+        - podSelector:
+            matchLabels:
+              app: order
+      ports:
+        - protocol: TCP
+          port: 8082

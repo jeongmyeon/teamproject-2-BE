@@ -19,14 +19,20 @@ resources:
   - config/service.yaml
   - apigateway/deployment.yaml
   - apigateway/service.yaml
+  - apigateway/networkpolicy.yaml
   - member/deployment.yaml
   - member/service.yaml
+  - member/networkpolicy.yaml
   - product/deployment.yaml
   - product/service.yaml
+  - product/networkpolicy.yaml
   - order/deployment.yaml
   - order/service.yaml
+  - order/networkpolicy.yaml
   - auction/deployment.yaml
   - auction/service.yaml
+  - auction/networkpolicy.yaml
   - payment/deployment.yaml
   - payment/service.yaml
+  - payment/networkpolicy.yaml
   - ingress.yaml

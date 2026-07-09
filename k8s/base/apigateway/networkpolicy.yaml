@@ -1,0 +1,24 @@
+# apigateway는 외부에서 유일하게 직접 접근되는 진입점이다.
+# ingress-nginx-controller가 hostNetwork: true 로 떠 있어서 트래픽 출발지가
+# "파드/네임스페이스"가 아니라 "노드의 실제 IP"로 보이기 때문에,
+# namespaceSelector 대신 노드 IP를 ipBlock으로 직접 허용한다.
+# (마스터/워커 둘 중 어디로 재스케줄되어도 막히지 않도록 둘 다 등록)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: apigateway-allow-ingress-nginx
+spec:
+  podSelector:
+    matchLabels:
+      app: apigateway
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 10.0.30.99/32   # 마스터 노드
+        - ipBlock:
+            cidr: 10.0.19.195/32  # 워커 노드
+      ports:
+        - protocol: TCP
+          port: 8000
