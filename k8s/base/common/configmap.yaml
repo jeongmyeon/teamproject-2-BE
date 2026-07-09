@@ -22,5 +22,4 @@ data:
   TZ: Asia/Seoul
   JAVA_TOOL_OPTIONS: -Duser.timezone=Asia/Seoul
   IMAGE_UPLOAD_PATH: /app/images
-  IMAGE_BASE_URL: https://api.example.com/images
-
+  IMAGE_BASE_URL: http://43.200.204.191:32595/images
