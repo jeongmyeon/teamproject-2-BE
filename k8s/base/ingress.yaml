@@ -4,10 +4,17 @@ metadata:
   name: biddy-api
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    # 인증서 정상 발급 확인되면 letsencrypt-staging -> letsencrypt-prod 로 변경
+    cert-manager.io/cluster-issuer: letsencrypt-staging
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - 43.200.204.191.nip.io
+      secretName: biddy-api-tls
   rules:
-    - http:
+    - host: 43.200.204.191.nip.io
+      http:
         paths:
           - path: /
             pathType: Prefix
