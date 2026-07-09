@@ -11,11 +11,11 @@ spring:
       globalcors:
         cors-configurations:
           '[/**]':
-            allowedOrigins:
-              - "http://localhost:5173"
-              - "http://127.0.0.1:5173"
+            allowedOriginPatterns:
+              - "http://localhost:*"
+              - "http://127.0.0.1:*"
               - "https://biddy-zeta.vercel.app"
-              - "http://biddy-zeta.vercel.app"
+              - "https://*.vercel.app"
             allowedMethods:
               - GET
               - POST
