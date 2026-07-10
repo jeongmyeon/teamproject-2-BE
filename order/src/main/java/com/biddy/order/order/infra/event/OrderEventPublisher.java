@@ -4,12 +4,13 @@ import com.biddy.order.order.application.dto.event.CancelPaymentEvent;
 import com.biddy.order.order.application.dto.event.DecreaseStockEvent;
 import com.biddy.order.order.application.dto.event.PurchaseConfirmedEvent;
 import com.biddy.order.order.application.dto.event.RestoreStockEvent;
+import com.biddy.order.outbox.domain.OutboxEvent;
+import com.biddy.order.outbox.domain.OutboxEventRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -21,7 +22,7 @@ import java.util.UUID;
 @ConditionalOnProperty(prefix = "kafka", name = "enabled", havingValue = "true")
 public class OrderEventPublisher {
 
-    private final KafkaTemplate<String, String> orderKafkaTemplate;
+    private final OutboxEventRepository outboxEventRepository;
     private final ObjectMapper objectMapper;
 
     // 1. 결제취소 이벤트 발행 (수신처: payment)
@@ -65,14 +66,14 @@ public class OrderEventPublisher {
     private void send(String topic, String key, Object event) {
         try {
             String payload = objectMapper.writeValueAsString(event);
-            orderKafkaTemplate.send(topic, key, payload)
-                    .whenComplete((result, throwable) -> {
-                        if (throwable != null) {
-                            log.error("Failed to publish event to topic {} for key: {}", topic, key, throwable);
-                        } else {
-                            log.info("Successfully published event to topic {}: {}", topic, payload);
-                        }
-                    });
+            OutboxEvent outboxEvent = OutboxEvent.builder()
+                    .aggregateType("ORDER")
+                    .aggregateId(key)
+                    .topic(topic)
+                    .payload(payload)
+                    .build();
+            outboxEventRepository.save(outboxEvent);
+            log.info("Successfully saved event to outbox for topic {}: {}", topic, payload);
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize Kafka event for topic: {}", topic, e);
         }
