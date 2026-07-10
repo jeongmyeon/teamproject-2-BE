@@ -30,6 +30,8 @@ public class SecurityConfig {
                         // 이미지 파일 및 헬스 체크는 누구나 접근 가능
                         .requestMatchers(HttpMethod.GET, "/images/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
+                        // 스웨거 문서는 누구나 접근 가능 (다른 서비스들과 동일하게)
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         // 로그인 필요한 GET (내 찜 목록)
                         .requestMatchers(HttpMethod.GET, "/api/products/liked").authenticated()
                         // 비로그인도 가능한 상품 조회
