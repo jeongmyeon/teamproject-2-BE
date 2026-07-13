@@ -55,6 +55,16 @@ spring:
           predicates:
             - Path=/api/payments/**
 
+        - id: chat-service
+          uri: lb://CHAT-SERVICE
+          predicates:
+            - Path=/api/chats/**
+
+        - id: chat-service-websocket
+          uri: lb:ws://CHAT-SERVICE
+          predicates:
+            - Path=/ws-chat/**
+
 eureka:
   client:
     service-url:

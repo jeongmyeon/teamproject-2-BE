@@ -19,12 +19,12 @@ public class JwtAuthenticationGlobalFilter implements GlobalFilter, Ordered {
 
     private final JwtTokenProvider jwtTokenProvider;
 
-    // 토큰 없이도 통과시켜야 하는 경로
     private static final List<String> WHITELIST = List.of(
             "/api/members/signup",
             "/api/members/login",
             "/api/members/email",
-            "/api/members/auth/refresh"
+            "/api/members/auth/refresh",
+            "/ws-chat"
     );
 
     @Override

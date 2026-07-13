@@ -219,6 +219,31 @@ services:
       TZ: Asia/Seoul
       JAVA_TOOL_OPTIONS: -Duser.timezone=Asia/Seoul
 
+  chat:
+    build: ./chat
+    container_name: biddy-chat
+    ports:
+      - "8086:8086"
+    depends_on:
+      discovery:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery:8761/eureka/
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      CHAT_DB: ${CHAT_DB:-biddy_chat}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET}
+      TZ: Asia/Seoul
+      JAVA_TOOL_OPTIONS: -Duser.timezone=Asia/Seoul
+
 volumes:
   postgres-data:
   redis-data:

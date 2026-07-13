@@ -29,4 +29,6 @@ resources:
   - auction/service.yaml
   - payment/deployment.yaml
   - payment/service.yaml
+  - chat/deployment.yaml
+  - chat/service.yaml
   - ingress.yaml
