@@ -13,29 +13,51 @@ import com.biddy.payment.wallet.presentation.response.DepositTransactionResponse
 import com.biddy.payment.wallet.presentation.request.DepositWithdrawRequest;
 import com.biddy.payment.wallet.infrastructure.persistence.DepositAccountRepository;
 import com.biddy.payment.wallet.infrastructure.persistence.DepositTransactionRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 public class DepositService {
 
     private static final String TOSS_PAYMENT_REFERENCE_TYPE = "TOSS_PAYMENT";
     private static final String TOSS_PAYMENT_CANCEL_REFERENCE_TYPE = "TOSS_PAYMENT_CANCEL";
+    private static final int DEFAULT_TRANSACTION_SIZE = 30;
+    private static final int MAX_TRANSACTION_SIZE = 100;
 
     private final DepositAccountRepository accountRepository;
     private final DepositTransactionRepository transactionRepository;
     private final TossPaymentClient tossPaymentClient;
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
+    private final long transactionCacheTtlSeconds;
 
     public DepositService(
             DepositAccountRepository accountRepository,
             DepositTransactionRepository transactionRepository,
-            TossPaymentClient tossPaymentClient
+            TossPaymentClient tossPaymentClient,
+            StringRedisTemplate redisTemplate,
+            ObjectMapper objectMapper,
+            @Value("${wallet.transactions.cache-ttl-seconds:30}") long transactionCacheTtlSeconds
     ) {
         this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
         this.tossPaymentClient = tossPaymentClient;
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
+        this.transactionCacheTtlSeconds = transactionCacheTtlSeconds;
     }
 
     @Transactional(readOnly = true)
@@ -47,6 +69,30 @@ public class DepositService {
 
     @Transactional(readOnly = true)
     public List<DepositTransactionResponse> getTransactions(Long userId) {
+        return getTransactions(userId, DEFAULT_TRANSACTION_SIZE);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DepositTransactionResponse> getTransactions(Long userId, int size) {
+        int querySize = normalizeTransactionSize(size);
+        String cacheKey = transactionCacheKey(userId, querySize);
+
+        List<DepositTransactionResponse> cachedTransactions = getCachedTransactions(cacheKey);
+        if (cachedTransactions != null) {
+            return cachedTransactions;
+        }
+
+        List<DepositTransactionResponse> transactions = transactionRepository
+                .findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(0, querySize))
+                .stream()
+                .map(DepositTransactionResponse::from)
+                .toList();
+        cacheTransactions(cacheKey, transactions);
+        return transactions;
+    }
+
+    @Transactional(readOnly = true)
+    public List<DepositTransactionResponse> getAllTransactions(Long userId) {
         return transactionRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
                 .map(DepositTransactionResponse::from)
                 .toList();
@@ -227,5 +273,66 @@ public class DepositService {
                 referenceId,
                 reason
         ));
+        evictTransactionCache(account.getUserId());
+    }
+
+    private int normalizeTransactionSize(int size) {
+        if (size <= 0) {
+            return DEFAULT_TRANSACTION_SIZE;
+        }
+        return Math.min(size, MAX_TRANSACTION_SIZE);
+    }
+
+    private List<DepositTransactionResponse> getCachedTransactions(String cacheKey) {
+        try {
+            String cached = redisTemplate.opsForValue().get(cacheKey);
+            if (cached == null) {
+                return null;
+            }
+            JavaType type = objectMapper.getTypeFactory()
+                    .constructCollectionType(List.class, DepositTransactionResponse.class);
+            return objectMapper.readValue(cached, type);
+        } catch (DataAccessException exception) {
+            log.warn("Wallet transaction cache read failed. cacheKey={}", cacheKey, exception);
+            return null;
+        } catch (JsonProcessingException exception) {
+            log.warn("Wallet transaction cache payload is invalid. cacheKey={}", cacheKey, exception);
+            try {
+                redisTemplate.delete(cacheKey);
+            } catch (DataAccessException dataAccessException) {
+                log.warn("Wallet transaction cache delete failed. cacheKey={}", cacheKey, dataAccessException);
+            }
+            return null;
+        }
+    }
+
+    private void cacheTransactions(String cacheKey, List<DepositTransactionResponse> transactions) {
+        try {
+            String payload = objectMapper.writeValueAsString(transactions);
+            redisTemplate.opsForValue().set(cacheKey, payload, transactionCacheTtlSeconds, TimeUnit.SECONDS);
+        } catch (DataAccessException exception) {
+            log.warn("Wallet transaction cache write failed. cacheKey={}", cacheKey, exception);
+        } catch (JsonProcessingException exception) {
+            log.warn("Wallet transaction cache serialization failed. cacheKey={}", cacheKey, exception);
+        }
+    }
+
+    private void evictTransactionCache(Long userId) {
+        try {
+            Set<String> keys = redisTemplate.keys(transactionCachePattern(userId) + ":*");
+            if (keys != null && !keys.isEmpty()) {
+                redisTemplate.delete(keys);
+            }
+        } catch (DataAccessException exception) {
+            log.warn("Wallet transaction cache eviction failed. userId={}", userId, exception);
+        }
+    }
+
+    private String transactionCacheKey(Long userId, int size) {
+        return transactionCachePattern(userId) + ":" + size;
+    }
+
+    private String transactionCachePattern(Long userId) {
+        return "wallet:transactions:" + userId + ":recent";
     }
 }

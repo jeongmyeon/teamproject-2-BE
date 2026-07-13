@@ -14,20 +14,26 @@ import com.biddy.payment.wallet.infrastructure.persistence.DepositAccountReposit
 import com.biddy.payment.wallet.infrastructure.persistence.DepositTransactionRepository;
 import com.biddy.payment.wallet.presentation.request.DepositChargeCancelRequest;
 import com.biddy.payment.wallet.presentation.response.DepositBalanceResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 class DepositServiceTest {
 
     private final DepositAccountRepository accountRepository = Mockito.mock(DepositAccountRepository.class);
     private final DepositTransactionRepository transactionRepository = Mockito.mock(DepositTransactionRepository.class);
     private final TossPaymentClient tossPaymentClient = Mockito.mock(TossPaymentClient.class);
+    private final StringRedisTemplate redisTemplate = Mockito.mock(StringRedisTemplate.class);
     private final DepositService depositService = new DepositService(
             accountRepository,
             transactionRepository,
-            tossPaymentClient
+            tossPaymentClient,
+            redisTemplate,
+            new ObjectMapper(),
+            30L
     );
 
     @Test
