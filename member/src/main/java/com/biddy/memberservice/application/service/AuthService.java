@@ -11,6 +11,7 @@ import com.biddy.memberservice.domain.model.RefreshToken;
 import com.biddy.memberservice.domain.repository.EmailVerificationRepository;
 import com.biddy.memberservice.domain.repository.MemberRepository;
 import com.biddy.memberservice.domain.repository.RefreshTokenRepository;
+import com.biddy.memberservice.infrastructure.security.JwtBlacklistService;
 import com.biddy.memberservice.infrastructure.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
@@ -33,6 +34,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final EmailVerificationRepository emailVerificationRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final JwtBlacklistService jwtBlacklistService;
     private final PasswordEncoder passwordEncoder;
     private final JavaMailSender mailSender;
     private final MemberEventPublisher eventPublisher;
@@ -119,8 +121,9 @@ public class AuthService {
     }
 
     @Transactional
-    public void logout(Long memberId) {
+    public void logout(Long memberId, String accessToken) {
         refreshTokenRepository.deleteByMemberId(memberId);
+        jwtBlacklistService.blacklist(accessToken);
     }
 
     @Transactional

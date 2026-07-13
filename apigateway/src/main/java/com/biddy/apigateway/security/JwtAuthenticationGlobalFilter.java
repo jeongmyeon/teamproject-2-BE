@@ -1,9 +1,11 @@
 package com.biddy.apigateway.security;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
+import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
@@ -14,11 +16,15 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationGlobalFilter implements GlobalFilter, Ordered {
 
+    private static final String BLACKLIST_KEY_PREFIX = "jwt:blacklist:";
+
     private final JwtTokenProvider jwtTokenProvider;
+    private final ReactiveStringRedisTemplate redisTemplate;
 
     // 토큰 없이도 통과시켜야 하는 경로 (인증 자체가 필요 없는 API)
     private static final List<String> WHITELIST = List.of(
@@ -57,15 +63,32 @@ public class JwtAuthenticationGlobalFilter implements GlobalFilter, Ordered {
             return exchange.getResponse().setComplete();
         }
 
-        String memberId = jwtTokenProvider.getMemberId(token);
-        String role = jwtTokenProvider.getRole(token);
+        return redisTemplate.hasKey(BLACKLIST_KEY_PREFIX + token)
+                // Redis 장애 시에는 블랙리스트 체크만 건너뛰고 서명/만료 검증 결과로 통과시킴 (fail-open)
+                .onErrorResume(e -> {
+                    log.warn("JWT 블랙리스트 조회 실패, 검증 스킵: {}", e.getMessage());
+                    return Mono.just(false);
+                })
+                .defaultIfEmpty(false)
+                .flatMap(isBlacklisted -> {
+                    if (Boolean.TRUE.equals(isBlacklisted)) {
+                        if (optionalAuth) {
+                            return chain.filter(exchange);
+                        }
+                        exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                        return exchange.getResponse().setComplete();
+                    }
 
-        ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
-                .header("X-Member-Id", memberId)
-                .header("X-Member-Role", role)
-                .build();
+                    String memberId = jwtTokenProvider.getMemberId(token);
+                    String role = jwtTokenProvider.getRole(token);
 
-        return chain.filter(exchange.mutate().request(mutatedRequest).build());
+                    ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
+                            .header("X-Member-Id", memberId)
+                            .header("X-Member-Role", role)
+                            .build();
+
+                    return chain.filter(exchange.mutate().request(mutatedRequest).build());
+                });
     }
 
     private boolean isWhitelisted(String path) {
