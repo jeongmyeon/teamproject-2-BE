@@ -22,6 +22,11 @@ public class ChatRoomController {
         return ResponseEntity.ok(chatRoomService.createOrGetRoom(request));
     }
 
+    @GetMapping("/rooms")
+    public ResponseEntity<List<ChatRoomResponse>> getMyRooms(@RequestHeader("X-Member-Id") Long memberId) {
+        return ResponseEntity.ok(chatRoomService.getMyRooms(memberId));
+    }
+
     @GetMapping("/rooms/{roomId}/messages")
     public ResponseEntity<List<ChatMessageResponse>> getMessages(
             @PathVariable Long roomId,

@@ -43,13 +43,17 @@
         let lastMessageId = null; // For pagination
 
         function connect() {
-            const token = document.getElementById('jwtToken').value;
+            let token = document.getElementById('jwtToken').value;
             currentRoomId = document.getElementById('roomId').value;
             myUserId = document.getElementById('myId').value;
 
             if (!token) {
                 alert("Please enter JWT Token");
                 return;
+            }
+            if (!token.startsWith("Bearer ")) {
+                token = "Bearer " + token;
+                document.getElementById('jwtToken').value = token;
             }
 
             stompClient = new StompJs.Client({

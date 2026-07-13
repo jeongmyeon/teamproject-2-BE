@@ -51,4 +51,10 @@ public class ChatRoomService {
                 .map(ChatMessageResponse::from)
                 .collect(Collectors.toList());
     }
+    @Transactional(readOnly = true)
+    public List<ChatRoomResponse> getMyRooms(Long memberId) {
+        return chatRoomRepository.findByBuyerIdOrSellerId(memberId, memberId).stream()
+                .map(room -> new ChatRoomResponse(room.getId(), room.getProductId(), room.getBuyerId(), room.getSellerId()))
+                .collect(Collectors.toList());
+    }
 }
