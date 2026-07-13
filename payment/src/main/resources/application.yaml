@@ -27,6 +27,15 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+payment:
+  idempotency:
+    ttl-minutes: ${PAYMENT_IDEMPOTENCY_TTL_MINUTES:30}
+    order-lock-ttl-minutes: ${PAYMENT_ORDER_LOCK_TTL_MINUTES:5}
 
 eureka:
   client:

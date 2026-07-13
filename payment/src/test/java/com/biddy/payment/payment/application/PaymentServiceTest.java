@@ -1,7 +1,10 @@
 package com.biddy.payment.payment.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -22,7 +25,9 @@ import com.biddy.payment.wallet.infrastructure.client.toss.TossPaymentConfirmRes
 import com.biddy.payment.wallet.presentation.request.DepositAdjustRequest;
 import com.biddy.payment.wallet.presentation.response.DepositBalanceResponse;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
@@ -47,6 +52,15 @@ class PaymentServiceTest {
 
     @MockBean
     private TossPaymentClient tossPaymentClient;
+
+    @MockBean
+    private PaymentIdempotencyService paymentIdempotencyService;
+
+    @BeforeEach
+    void setUp() {
+        when(paymentIdempotencyService.begin(anyLong(), anyString())).thenReturn(Optional.empty());
+        when(paymentIdempotencyService.acquireOrderLock(anyLong())).thenReturn("order-lock-token");
+    }
 
     @Test
     void walletPayment_decreasesDepositAndPublishesCompletedEvent() {
@@ -73,7 +87,7 @@ class PaymentServiceTest {
                 null,
                 null,
                 null
-        ), "USER");
+        ), "USER", "wallet-payment-key-100");
 
         assertThat(response.status()).isEqualTo(PaymentStatus.COMPLETED);
         DepositBalanceResponse balance = depositService.getBalance(buyerId);
@@ -123,7 +137,7 @@ class PaymentServiceTest {
                 null,
                 paymentKey,
                 tossOrderId
-        ), "USER");
+        ), "USER", "normal-payment-key-200");
 
         assertThat(response.status()).isEqualTo(PaymentStatus.COMPLETED);
         assertThat(response.pgTransactionId()).isEqualTo(paymentKey);
@@ -143,6 +157,49 @@ class PaymentServiceTest {
         assertThat(event.amount()).isEqualTo(amount);
         assertThat(event.paymentMethod()).isEqualTo(PaymentMethod.NORMAL);
         assertThat(event.paidAt()).isNotNull();
+    }
+
+    @Test
+    void repeatedIdempotencyKey_returnsExistingPaymentWithoutProcessingAgain() {
+        Long orderId = 2_500L;
+        Long buyerId = 3_000L;
+        Long sellerId = 4_000L;
+        Long amount = 30_000L;
+        String idempotencyKey = "same-payment-key-250";
+
+        depositService.adjust(new DepositAdjustRequest(buyerId, 100_000L, "테스트 예치금 지급"));
+        when(orderClient.getPaymentInfo(orderId)).thenReturn(new OrderPaymentInfo(
+                orderId,
+                buyerId,
+                sellerId,
+                amount,
+                OrderPaymentStatus.PAYMENT_PENDING,
+                LocalDateTime.now().plusMinutes(10)
+        ));
+
+        PaymentCreateRequest request = new PaymentCreateRequest(
+                orderId,
+                buyerId,
+                amount,
+                PaymentMethod.WALLET,
+                null,
+                null,
+                null
+        );
+        PaymentResponse firstResponse = paymentService.create(request, "USER", idempotencyKey);
+
+        Mockito.clearInvocations(orderClient, paymentEventProducer, paymentIdempotencyService);
+        when(paymentIdempotencyService.begin(buyerId, idempotencyKey)).thenReturn(Optional.of(firstResponse.id()));
+
+        PaymentResponse repeatedResponse = paymentService.create(request, "USER", idempotencyKey);
+
+        assertThat(repeatedResponse.id()).isEqualTo(firstResponse.id());
+        assertThat(repeatedResponse.status()).isEqualTo(PaymentStatus.COMPLETED);
+        assertThat(depositService.getBalance(buyerId).balance()).isEqualTo(70_000L);
+
+        verify(paymentIdempotencyService, never()).acquireOrderLock(anyLong());
+        verify(orderClient, never()).getPaymentInfo(anyLong());
+        verify(paymentEventProducer, never()).publish(Mockito.any(PaymentCompletedEvent.class));
     }
 
     @Test
@@ -170,7 +227,7 @@ class PaymentServiceTest {
                 null,
                 null,
                 null
-        ), "USER");
+        ), "USER", "wallet-payment-key-300");
         Mockito.clearInvocations(paymentEventProducer);
 
         paymentService.cancelByOrderCancellation(new OrderCancelledEvent(
@@ -224,7 +281,7 @@ class PaymentServiceTest {
                 null,
                 paymentKey,
                 tossOrderId
-        ), "USER");
+        ), "USER", "normal-payment-key-400");
         Mockito.clearInvocations(paymentEventProducer);
 
         paymentService.cancelByOrderCancellation(new OrderCancelledEvent(
