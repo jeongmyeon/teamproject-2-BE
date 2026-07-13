@@ -26,9 +26,12 @@ import jakarta.persistence.EntityNotFoundException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class PaymentService {
@@ -39,6 +42,7 @@ public class PaymentService {
     private final OrderClient orderClient;
     private final PaymentEventProducer paymentEventProducer;
     private final TossPaymentClient tossPaymentClient;
+    private final PaymentIdempotencyService paymentIdempotencyService;
 
     public PaymentService(
             PaymentRepository paymentRepository,
@@ -46,7 +50,8 @@ public class PaymentService {
             DepositService depositService,
             OrderClient orderClient,
             PaymentEventProducer paymentEventProducer,
-            TossPaymentClient tossPaymentClient
+            TossPaymentClient tossPaymentClient,
+            PaymentIdempotencyService paymentIdempotencyService
     ) {
         this.paymentRepository = paymentRepository;
         this.paymentCancelRepository = paymentCancelRepository;
@@ -54,10 +59,33 @@ public class PaymentService {
         this.orderClient = orderClient;
         this.paymentEventProducer = paymentEventProducer;
         this.tossPaymentClient = tossPaymentClient;
+        this.paymentIdempotencyService = paymentIdempotencyService;
     }
 
     @Transactional
-    public PaymentResponse create(PaymentCreateRequest request, String memberRole) {
+    public PaymentResponse create(PaymentCreateRequest request, String memberRole, String idempotencyKey) {
+        Optional<Long> completedPaymentId = paymentIdempotencyService.begin(request.userId(), idempotencyKey);
+        if (completedPaymentId.isPresent()) {
+            Payment payment = findPayment(completedPaymentId.get());
+            validatePaymentOwner(payment, request.userId());
+            return toResponse(payment);
+        }
+
+        String orderLockToken = null;
+        try {
+            orderLockToken = paymentIdempotencyService.acquireOrderLock(request.orderId());
+            registerOrderLockRelease(request.orderId(), orderLockToken);
+
+            PaymentResponse response = processCreate(request, memberRole);
+            registerIdempotencyCompletion(request.userId(), idempotencyKey, response.id());
+            return response;
+        } catch (RuntimeException exception) {
+            paymentIdempotencyService.clear(request.userId(), idempotencyKey);
+            throw exception;
+        }
+    }
+
+    private PaymentResponse processCreate(PaymentCreateRequest request, String memberRole) {
         if (paymentRepository.existsByOrderIdAndStatus(request.orderId(), PaymentStatus.COMPLETED)) {
             throw new IllegalStateException("이미 결제가 완료된 주문입니다.");
         }
@@ -108,6 +136,41 @@ public class PaymentService {
         }
 
         return toResponse(payment);
+    }
+
+    private void registerIdempotencyCompletion(Long memberId, String idempotencyKey, Long paymentId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            paymentIdempotencyService.complete(memberId, idempotencyKey, paymentId);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                paymentIdempotencyService.complete(memberId, idempotencyKey, paymentId);
+            }
+
+            @Override
+            public void afterCompletion(int status) {
+                if (status != STATUS_COMMITTED) {
+                    paymentIdempotencyService.clear(memberId, idempotencyKey);
+                }
+            }
+        });
+    }
+
+    private void registerOrderLockRelease(Long orderId, String token) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            paymentIdempotencyService.releaseOrderLock(orderId, token);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                paymentIdempotencyService.releaseOrderLock(orderId, token);
+            }
+        });
     }
 
     @Transactional(readOnly = true)
