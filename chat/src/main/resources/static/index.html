@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        #chat-box { width: 400px; height: 300px; border: 1px solid #ccc; overflow-y: scroll; padding: 10px; margin-bottom: 10px; }
+        .msg { margin-bottom: 5px; }
+        .my-msg { color: blue; text-align: right; }
+        .other-msg { color: green; }
+    </style>
+</head>
+<body>
+    <h2>Chat Test Client</h2>
+    
+    <div>
+        <label>JWT Token:</label>
+        <input type="text" id="jwtToken" style="width:300px;" placeholder="Bearer ...">
+    </div>
+    <div style="margin-top: 10px;">
+        <label>Room ID:</label>
+        <input type="number" id="roomId" value="1">
+        <label>My User ID:</label>
+        <input type="number" id="myId" value="1">
+        <button onclick="connect()">Connect & Load History</button>
+        <button onclick="disconnect()" disabled id="btnDisconnect">Disconnect</button>
+    </div>
+
+    <hr>
+    
+    <div id="chat-box"></div>
+    
+    <div>
+        <input type="text" id="messageInput" style="width: 300px;" placeholder="Type a message..." disabled>
+        <button onclick="sendMessage()" disabled id="btnSend">Send</button>
+    </div>
+
+    <script>
+        let stompClient = null;
+        let currentRoomId = null;
+        let myUserId = null;
+        let lastMessageId = null; // For pagination
+
+        function connect() {
+            let token = document.getElementById('jwtToken').value;
+            currentRoomId = document.getElementById('roomId').value;
+            myUserId = document.getElementById('myId').value;
+
+            if (!token) {
+                alert("Please enter JWT Token");
+                return;
+            }
+            if (!token.startsWith("Bearer ")) {
+                token = "Bearer " + token;
+                document.getElementById('jwtToken').value = token;
+            }
+
+            stompClient = new StompJs.Client({
+                brokerURL: 'ws://localhost:8000/ws-chat',
+                connectHeaders: {
+                    Authorization: token
+                },
+                debug: function (str) {
+                    console.log(str);
+                },
+                reconnectDelay: 5000,
+                heartbeatIncoming: 4000,
+                heartbeatOutgoing: 4000,
+            });
+
+            stompClient.onConnect = function (frame) {
+                console.log('Connected: ' + frame);
+                document.getElementById('btnDisconnect').disabled = false;
+                document.getElementById('btnSend').disabled = false;
+                document.getElementById('messageInput').disabled = false;
+                
+                // Subscribe to the room
+                stompClient.subscribe('/topic/room/' + currentRoomId, function (message) {
+                    showMessage(JSON.parse(message.body));
+                });
+
+                // Load initial history
+                loadHistory();
+            };
+
+            stompClient.onStompError = function (frame) {
+                console.error('Broker reported error: ' + frame.headers['message']);
+                console.error('Additional details: ' + frame.body);
+            };
+
+            stompClient.activate();
+        }
+
+        function disconnect() {
+            if (stompClient !== null) {
+                stompClient.deactivate();
+            }
+            console.log("Disconnected");
+            document.getElementById('btnDisconnect').disabled = true;
+            document.getElementById('btnSend').disabled = true;
+            document.getElementById('messageInput').disabled = true;
+        }
+
+        function sendMessage() {
+            const content = document.getElementById('messageInput').value;
+            if (content && stompClient) {
+                const request = {
+                    roomId: currentRoomId,
+                    content: content
+                };
+                stompClient.publish({
+                    destination: '/app/chat.send',
+                    body: JSON.stringify(request)
+                });
+                document.getElementById('messageInput').value = '';
+            }
+        }
+
+        function showMessage(msg) {
+            const chatBox = document.getElementById('chat-box');
+            const div = document.createElement('div');
+            div.className = 'msg ' + (msg.senderId == myUserId ? 'my-msg' : 'other-msg');
+            div.innerText = `[${msg.senderId}] ${msg.content}`;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function loadHistory() {
+            // Using API Gateway /api/chats to fetch history
+            let url = `http://localhost:8000/api/chats/rooms/${currentRoomId}/messages?size=20`;
+            if (lastMessageId) {
+                url += `&lastMessageId=${lastMessageId}`;
+            }
+
+            const token = document.getElementById('jwtToken').value;
+            fetch(url, {
+                headers: {
+                    'Authorization': token
+                }
+            })
+                .then(res => {
+                    if (!res.ok) throw new Error("Status " + res.status);
+                    return res.json();
+                })
+                .then(data => {
+                    const chatBox = document.getElementById('chat-box');
+                    // Data is sorted DESC, so we need to reverse it to display chronologically
+                    data.reverse().forEach(msg => {
+                        const div = document.createElement('div');
+                        div.className = 'msg ' + (msg.senderId == myUserId ? 'my-msg' : 'other-msg');
+                        div.innerText = `[${msg.senderId}] ${msg.content}`;
+                        chatBox.insertBefore(div, chatBox.firstChild);
+                        
+                        // Keep track of the oldest message ID for pagination
+                        if (!lastMessageId || msg.id < lastMessageId) {
+                            lastMessageId = msg.id;
+                        }
+                    });
+                })
+                .catch(err => console.error("Failed to load history", err));
+        }
+    </script>
+</body>
+</html>

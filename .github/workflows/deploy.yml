@@ -12,6 +12,7 @@ on:
       - CI - Order
       - CI - Auction
       - CI - Payment
+      - CI - Chat
       - CI - Infra
     types: [completed]
     branches: [develop]
@@ -48,13 +49,14 @@ jobs:
               "CI - Order") DEPLOYMENTS="order" ;;
               "CI - Auction") DEPLOYMENTS="auction" ;;
               "CI - Payment") DEPLOYMENTS="payment" ;;
+              "CI - Chat") DEPLOYMENTS="chat" ;;
               "CI - Infra") DEPLOYMENTS="config apigateway discovery" ;;
               *) DEPLOYMENTS="" ;;
             esac
           fi
 
           if [ "$DEPLOYMENTS" = "all" ]; then
-            DEPLOYMENTS="config discovery apigateway member product order auction payment"
+            DEPLOYMENTS="config discovery apigateway member product order auction payment chat"
           fi
 
           echo "deployments=$DEPLOYMENTS" >> "$GITHUB_OUTPUT"

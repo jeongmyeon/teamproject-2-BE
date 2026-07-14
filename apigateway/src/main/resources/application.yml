@@ -59,6 +59,16 @@ spring:
           predicates:
             - Path=/api/payments/**
 
+        - id: chat-service
+          uri: lb://CHAT-SERVICE
+          predicates:
+            - Path=/api/chats/**
+
+        - id: chat-service-websocket
+          uri: lb:ws://CHAT-SERVICE
+          predicates:
+            - Path=/ws-chat/**
+
         # 각 서비스의 OpenAPI 스펙을 gateway 하나로 모아서 보기 위한 라우트
         # (gateway 자체의 /swagger-ui 에서 springdoc.swagger-ui.urls 로 이 경로들을 불러옴)
         - id: member-service-docs
