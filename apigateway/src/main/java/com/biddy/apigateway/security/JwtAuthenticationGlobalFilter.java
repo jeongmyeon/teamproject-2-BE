@@ -32,6 +32,7 @@ public class JwtAuthenticationGlobalFilter implements GlobalFilter, Ordered {
             "/api/members/login",
             "/api/members/email",
             "/api/members/auth/refresh",
+            "/api/chatbot",
             "/v3/api-docs",
             "/swagger-ui",
             "/ws-chat"

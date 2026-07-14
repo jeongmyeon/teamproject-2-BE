@@ -69,6 +69,11 @@ spring:
           predicates:
             - Path=/ws-chat/**
 
+        - id: chatbot-service
+          uri: lb://CHATBOT-SERVICE
+          predicates:
+            - Path=/api/chatbot/**
+
         # 각 서비스의 OpenAPI 스펙을 gateway 하나로 모아서 보기 위한 라우트
         # (gateway 자체의 /swagger-ui 에서 springdoc.swagger-ui.urls 로 이 경로들을 불러옴)
         - id: member-service-docs
@@ -106,6 +111,13 @@ spring:
           filters:
             - RewritePath=/v3/api-docs/payment-service, /v3/api-docs
 
+        - id: chatbot-service-docs
+          uri: lb://CHATBOT-SERVICE
+          predicates:
+            - Path=/v3/api-docs/chatbot-service
+          filters:
+            - RewritePath=/v3/api-docs/chatbot-service, /v3/api-docs
+
 eureka:
   client:
     service-url:
@@ -142,3 +154,5 @@ springdoc:
         url: /v3/api-docs/auction-service
       - name: payment-service
         url: /v3/api-docs/payment-service
+      - name: chatbot-service
+        url: /v3/api-docs/chatbot-service
