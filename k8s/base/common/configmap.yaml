@@ -12,6 +12,7 @@ data:
   AUCTION_DB: biddy_auction
   PAYMENT_DB: biddy_payment
   CHAT_DB: biddy_chat
+  CHATBOT_DB: biddy_chatbot
   KAFKA_BOOTSTRAP_SERVERS: kafka:9092
   REDIS_HOST: redis
   REDIS_PORT: "6379"

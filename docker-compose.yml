@@ -260,7 +260,7 @@ services:
     build: ./chatbot
     container_name: biddy-chatbot
     ports:
-      - "8089:8089"
+      - "8088:8088"
     depends_on:
       discovery:
         condition: service_healthy

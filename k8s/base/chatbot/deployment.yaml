@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chatbot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chatbot
+  template:
+    metadata:
+      labels:
+        app: chatbot
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8088"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      imagePullSecrets:
+        - name: ghcr-secret
+      containers:
+        - name: chatbot
+          image: ghcr.io/prgrms-be-adv-devcourse/chatbot:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8088
+          envFrom:
+            - configMapRef:
+                name: biddy-common-config
+            - secretRef:
+                name: biddy-secret
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8088
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            timeoutSeconds: 5
