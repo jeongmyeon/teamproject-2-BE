@@ -1,0 +1,30 @@
+---
+# Service: K8s 내부에서 'kafka:9092'로 접근
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: biddy
+spec:
+  type: ClusterIP
+  ports:
+    - name: broker
+      port: 9092
+      targetPort: 9092
+      protocol: TCP
+  # selector 없음 → Endpoint를 수동으로 지정
+
+---
+# Endpoint: Docker 호스트 IP를 지정
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: kafka  # Service와 이름이 같아야 함
+  namespace: biddy
+subsets:
+  - addresses:
+      - ip: 10.0.30.99  # AWS EC2 Private IP
+    ports:
+      - name: broker
+        port: 9092
+        protocol: TCP
