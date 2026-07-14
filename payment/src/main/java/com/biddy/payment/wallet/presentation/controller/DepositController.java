@@ -13,7 +13,6 @@ import java.util.List;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -71,7 +70,10 @@ public class DepositController {
     }
 
     @GetMapping("/transactions")
-    public ApiResponse<List<DepositTransactionResponse>> getTransactions(@AuthenticationPrincipal Long memberId) {
-        return ApiResponse.ok(depositService.getTransactions(memberId));
+    public ApiResponse<List<DepositTransactionResponse>> getTransactions(
+            @AuthenticationPrincipal Long memberId,
+            @RequestParam(value = "size", defaultValue = "30") int size
+    ) {
+        return ApiResponse.ok(depositService.getTransactions(memberId, size));
     }
 }

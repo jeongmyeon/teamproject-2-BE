@@ -47,6 +47,14 @@ public class OutboxEvent {
 
     private LocalDateTime processedAt;
 
+    private LocalDateTime lastAttemptAt;
+
+    @Column(nullable = false)
+    private int retryCount;
+
+    @Column(columnDefinition = "TEXT")
+    private String lastError;
+
     @Builder
     public OutboxEvent(String aggregateType, String aggregateId, String topic, String payload) {
         this.aggregateType = aggregateType;
@@ -54,15 +62,38 @@ public class OutboxEvent {
         this.topic = topic;
         this.payload = payload;
         this.status = OutboxStatus.PENDING;
+        this.retryCount = 0;
     }
 
     public void markAsProcessed() {
         this.status = OutboxStatus.PROCESSED;
         this.processedAt = LocalDateTime.now();
+        this.lastAttemptAt = this.processedAt;
+        this.lastError = null;
+    }
+
+    public void markAsFailed(Throwable throwable, int maxRetryCount) {
+        this.retryCount++;
+        this.lastAttemptAt = LocalDateTime.now();
+        this.lastError = resolveErrorMessage(throwable);
+        if (this.retryCount >= maxRetryCount) {
+            this.status = OutboxStatus.FAILED;
+        }
     }
 
     @PrePersist
     void prePersist() {
         this.createdAt = LocalDateTime.now();
+    }
+
+    private String resolveErrorMessage(Throwable throwable) {
+        if (throwable == null) {
+            return null;
+        }
+        String message = throwable.getMessage();
+        if (message == null || message.isBlank()) {
+            message = throwable.getClass().getSimpleName();
+        }
+        return message.length() > 1000 ? message.substring(0, 1000) : message;
     }
 }

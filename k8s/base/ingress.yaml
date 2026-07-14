@@ -4,10 +4,16 @@ metadata:
   name: biddy-api
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - 43.200.204.191.nip.io
+      secretName: biddy-api-tls
   rules:
-    - http:
+    - host: 43.200.204.191.nip.io
+      http:
         paths:
           - path: /
             pathType: Prefix

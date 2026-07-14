@@ -17,6 +17,18 @@ public class GlobalExceptionHandler {
                 .body(com.biddy.payment.global.response.ErrorResponse.of("NOT_FOUND", exception.getMessage()));
     }
 
+    @ExceptionHandler(PaymentConflictException.class)
+    public ResponseEntity<com.biddy.payment.global.response.ErrorResponse> handleConflict(PaymentConflictException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(com.biddy.payment.global.response.ErrorResponse.of("CONFLICT", exception.getMessage()));
+    }
+
+    @ExceptionHandler(PaymentRedisUnavailableException.class)
+    public ResponseEntity<com.biddy.payment.global.response.ErrorResponse> handleRedisUnavailable(PaymentRedisUnavailableException exception) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(com.biddy.payment.global.response.ErrorResponse.of("SERVICE_UNAVAILABLE", exception.getMessage()));
+    }
+
     @ExceptionHandler({
             IllegalArgumentException.class,
             IllegalStateException.class,

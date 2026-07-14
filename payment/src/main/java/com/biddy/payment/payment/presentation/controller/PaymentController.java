@@ -29,10 +29,11 @@ public class PaymentController {
     public ApiResponse<PaymentResponse> create(
             @AuthenticationPrincipal Long memberId,
             @RequestHeader("X-Member-Role") String memberRole,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody PaymentCreateRequest request
     ) {
         return ApiResponse.ok(
-                paymentService.create(request.withUserId(memberId), memberRole),
+                paymentService.create(request.withUserId(memberId), memberRole, idempotencyKey),
                 "결제가 생성되었습니다."
         );
     }

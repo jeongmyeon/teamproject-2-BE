@@ -86,10 +86,14 @@ services:
     depends_on:
       discovery:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery:8761/eureka/
       SPRING_CLOUD_CONFIG_URI: http://config:8888
       JWT_SECRET: ${JWT_SECRET}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
 
   # ==================== 비즈니스 도메인 ====================
 
@@ -105,6 +109,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery:8761/eureka/
       POSTGRES_HOST: postgres
@@ -117,6 +123,8 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
 
   product:
     build: ./product
@@ -129,6 +137,8 @@ services:
       postgres:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     environment:
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery:8761/eureka/
@@ -213,6 +223,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       ORDER_SERVICE_URL: http://order:8083
       TOSS_PAYMENTS_BASE_URL: ${TOSS_PAYMENTS_BASE_URL}
       TOSS_PAYMENTS_SECRET_KEY: ${TOSS_PAYMENTS_SECRET_KEY}

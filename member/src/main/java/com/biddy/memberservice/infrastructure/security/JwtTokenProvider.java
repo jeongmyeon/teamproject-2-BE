@@ -60,6 +60,12 @@ public class JwtTokenProvider {
         return MemberRole.valueOf(getClaims(token).get("role", String.class));
     }
 
+    // 토큰의 남은 유효시간(ms). 이미 만료된 토큰이면 0 이하 값을 반환한다.
+    public long getRemainingMillis(String token) {
+        Date expiration = getClaims(token).getExpiration();
+        return expiration.getTime() - System.currentTimeMillis();
+    }
+
     // 토큰 유효성 검증
     public boolean validateToken(String token) {
         try {

@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: apigateway
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
   cloud:
     gateway:
       default-filters:
@@ -65,6 +69,43 @@ spring:
           predicates:
             - Path=/ws-chat/**
 
+        # 각 서비스의 OpenAPI 스펙을 gateway 하나로 모아서 보기 위한 라우트
+        # (gateway 자체의 /swagger-ui 에서 springdoc.swagger-ui.urls 로 이 경로들을 불러옴)
+        - id: member-service-docs
+          uri: lb://MEMBER-SERVICE
+          predicates:
+            - Path=/v3/api-docs/member-service
+          filters:
+            - RewritePath=/v3/api-docs/member-service, /v3/api-docs
+
+        - id: product-service-docs
+          uri: lb://PRODUCT-SERVICE
+          predicates:
+            - Path=/v3/api-docs/product-service
+          filters:
+            - RewritePath=/v3/api-docs/product-service, /v3/api-docs
+
+        - id: order-service-docs
+          uri: lb://ORDER-SERVICE
+          predicates:
+            - Path=/v3/api-docs/order-service
+          filters:
+            - RewritePath=/v3/api-docs/order-service, /v3/api-docs
+
+        - id: auction-service-docs
+          uri: lb://AUCTION-SERVICE
+          predicates:
+            - Path=/v3/api-docs/auction-service
+          filters:
+            - RewritePath=/v3/api-docs/auction-service, /v3/api-docs
+
+        - id: payment-service-docs
+          uri: lb://PAYMENT-SERVICE
+          predicates:
+            - Path=/v3/api-docs/payment-service
+          filters:
+            - RewritePath=/v3/api-docs/payment-service, /v3/api-docs
+
 eureka:
   client:
     service-url:
@@ -87,3 +128,17 @@ management:
 
 jwt:
   secret: ${JWT_SECRET:biddy-default-jwt-secret-key-for-development-only}
+
+springdoc:
+  swagger-ui:
+    urls:
+      - name: member-service
+        url: /v3/api-docs/member-service
+      - name: product-service
+        url: /v3/api-docs/product-service
+      - name: order-service
+        url: /v3/api-docs/order-service
+      - name: auction-service
+        url: /v3/api-docs/auction-service
+      - name: payment-service
+        url: /v3/api-docs/payment-service
