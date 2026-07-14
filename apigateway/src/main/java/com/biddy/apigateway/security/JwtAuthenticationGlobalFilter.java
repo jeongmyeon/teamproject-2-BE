@@ -40,7 +40,7 @@ public class JwtAuthenticationGlobalFilter implements GlobalFilter, Ordered {
     // 비로그인도 조회 가능하지만, 로그인 상태면 회원 정보를 같이 넘겨줘야 하는 경로
     // (예: 상품 목록/상세는 비로그인도 보이지만, 로그인 상태면 찜 여부 등을 함께 응답해야 함)
     private static final List<String> OPTIONAL_AUTH_GET_WHITELIST = List.of(
-            "/api/products"
+            "/api/products",
             "/api/members/auth/refresh"
     );
 
