@@ -18,7 +18,10 @@ public class ChatRoomController {
     private final ChatRoomService chatRoomService;
 
     @PostMapping("/rooms")
-    public ResponseEntity<ChatRoomResponse> createOrGetRoom(@RequestBody ChatRoomRequest request) {
+    public ResponseEntity<ChatRoomResponse> createOrGetRoom(
+            @RequestHeader("X-Member-Id") Long memberId,
+            @RequestBody ChatRoomRequest request) {
+        request.setBuyerId(memberId);
         return ResponseEntity.ok(chatRoomService.createOrGetRoom(request));
     }
 
