@@ -67,7 +67,7 @@ spring:
         - id: chat-service-websocket
           uri: lb:ws://CHAT-SERVICE
           predicates:
-            - Path=/ws-chat/**
+            - Path=/api/ws-chat/**
 
         - id: chatbot-service
           uri: lb://CHATBOT-SERVICE

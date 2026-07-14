@@ -35,7 +35,7 @@ public class JwtAuthenticationGlobalFilter implements GlobalFilter, Ordered {
             "/api/chatbot",
             "/v3/api-docs",
             "/swagger-ui",
-            "/ws-chat"
+            "/api/ws-chat"
     );
 
     // 비로그인도 조회 가능하지만, 로그인 상태면 회원 정보를 같이 넘겨줘야 하는 경로
