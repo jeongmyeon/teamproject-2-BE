@@ -6,4 +6,8 @@ CREATE DATABASE biddy_product;
 CREATE DATABASE biddy_order;
 CREATE DATABASE biddy_auction;
 CREATE DATABASE biddy_payment;
+
+CREATE DATABASE biddy_chatbot;
+\connect biddy_chatbot
+CREATE EXTENSION IF NOT EXISTS vector;
 CREATE DATABASE biddy_chat;

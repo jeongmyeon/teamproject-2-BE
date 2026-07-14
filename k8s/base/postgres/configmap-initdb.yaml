@@ -13,3 +13,4 @@ data:
     CREATE DATABASE biddy_auction;
     CREATE DATABASE biddy_payment;
     CREATE DATABASE biddy_chat;
+    CREATE DATABASE biddy_chatbot;

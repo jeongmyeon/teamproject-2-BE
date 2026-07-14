@@ -32,4 +32,6 @@ resources:
   - payment/service.yaml
   - chat/deployment.yaml
   - chat/service.yaml
+  - chatbot/deployment.yaml
+  - chatbot/service.yaml
   - ingress.yaml
