@@ -10,6 +10,7 @@ on:
     branches: [ develop ]
     paths:
       - 'chat/**'
+  workflow_dispatch:
 
 concurrency:
   group: ci-chat-${{ github.ref }}
