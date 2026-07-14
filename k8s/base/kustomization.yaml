@@ -6,13 +6,9 @@ namespace: biddy
 resources:
   - namespace.yaml
   - common/configmap.yaml
-  - postgres/configmap-initdb.yaml
-  - postgres/deployment.yaml
-  - postgres/service.yaml
-  - redis/deployment.yaml
-  - redis/service.yaml
-  - kafka/deployment.yaml
-  - kafka/service.yaml
+  - external-services/postgres-external.yaml
+  - external-services/redis-external.yaml
+  - external-services/kafka-external.yaml
   - discovery/deployment.yaml
   - discovery/service.yaml
   - config/deployment.yaml
