@@ -6,12 +6,11 @@ on:
     branches: [ develop ]
     paths:
       - 'search/**'
-      - 'settings.gradle'
   pull_request:
     branches: [ develop ]
     paths:
       - 'search/**'
-      - 'settings.gradle'
+  workflow_dispatch:
 
 concurrency:
   group: ci-search-${{ github.ref }}
