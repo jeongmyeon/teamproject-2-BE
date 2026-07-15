@@ -150,6 +150,8 @@ services:
       TZ: Asia/Seoul
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       IMAGE_BASE_URL: ${IMAGE_BASE_URL:-http://localhost:8082/images}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      PRODUCT_EMBEDDING_ENABLED: ${PRODUCT_EMBEDDING_ENABLED:-true}
     volumes:
       - product-images:/app/images
 

@@ -3,6 +3,7 @@ package com.biddy.productservice.presentation.controller;
 
 import com.biddy.productservice.application.service.ProductImageService;
 import com.biddy.productservice.application.service.ProductLikeService;
+import com.biddy.productservice.application.service.ProductSemanticSearchService;
 import com.biddy.productservice.application.usecase.ProductCommandUseCase;
 import com.biddy.productservice.application.usecase.ProductQueryUseCase;
 import com.biddy.productservice.domain.model.Product;
@@ -34,6 +35,7 @@ public class ProductController {
     private final ProductQueryUseCase productQueryUseCase;
     private final ProductImageService productImageService;
     private final ProductLikeService productLikeService;
+    private final ProductSemanticSearchService productSemanticSearchService;
 
     @PostMapping
     @Operation(summary = "상품 등록",description = "상품을 새로 등록합니다. 로그인 필요.")
@@ -88,6 +90,15 @@ public class ProductController {
             return productQueryUseCase.getBySaleType(saleType);
         }
         return productQueryUseCase.getAll();
+    }
+
+    @GetMapping("/search/semantic")
+    @Operation(summary = "상품 의미 검색", description = "검색어를 텍스트 임베딩으로 변환한 뒤 pgvector 유사도 검색을 수행합니다.")
+    public List<Product> semanticSearch(
+            @RequestParam String query,
+            @RequestParam(defaultValue = "20") int limit
+    ) {
+        return productSemanticSearchService.search(query, limit);
     }
 
     @GetMapping("/{id}")
