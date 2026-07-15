@@ -33,13 +33,21 @@ public class ChatRoomService {
                                 .build()
                 ));
 
-        return new ChatRoomResponse(chatRoom.getId(), chatRoom.getProductId(), chatRoom.getBuyerId(), chatRoom.getSellerId());
+        return ChatRoomResponse.builder()
+                .id(chatRoom.getId())
+                .productId(chatRoom.getProductId())
+                .buyerId(chatRoom.getBuyerId())
+                .sellerId(chatRoom.getSellerId())
+                .build();
     }
 
-    @Transactional(readOnly = true)
-    public List<ChatMessageResponse> getMessages(Long roomId, Long lastMessageId, int size) {
+    @Transactional
+    public List<ChatMessageResponse> getMessages(Long roomId, Long memberId, Long lastMessageId, int size) {
         PageRequest pageRequest = PageRequest.of(0, size);
         List<ChatMessage> messages;
+        
+        // 메시지를 읽어갈 때 안 읽은 메시지 읽음 처리 (내 memberId가 수신자인 경우)
+        chatMessageRepository.markMessagesAsRead(roomId, memberId);
         
         if (lastMessageId == null) {
             messages = chatMessageRepository.findByRoomIdOrderByIdDesc(roomId, pageRequest);
@@ -54,7 +62,26 @@ public class ChatRoomService {
     @Transactional(readOnly = true)
     public List<ChatRoomResponse> getMyRooms(Long memberId) {
         return chatRoomRepository.findByBuyerIdOrSellerId(memberId, memberId).stream()
-                .map(room -> new ChatRoomResponse(room.getId(), room.getProductId(), room.getBuyerId(), room.getSellerId()))
+                .map(room -> {
+                    // 가장 최근 메시지 조회
+                    ChatMessage lastMessage = chatMessageRepository.findTopByRoomIdOrderByIdDesc(room.getId()).orElse(null);
+                    // 안 읽은 메시지 개수 조회
+                    long unreadCount = chatMessageRepository.countByRoomIdAndSenderIdNotAndIsReadFalse(room.getId(), memberId);
+                    
+                    return ChatRoomResponse.builder()
+                            .id(room.getId())
+                            .productId(room.getProductId())
+                            .buyerId(room.getBuyerId())
+                            .sellerId(room.getSellerId())
+                            .lastMessage(lastMessage != null ? lastMessage.getContent() : null)
+                            .lastMessageAt(lastMessage != null ? lastMessage.getCreatedAt() : null)
+                            .unreadCount(unreadCount)
+                            .build();
+                })
                 .collect(Collectors.toList());
+    }
+    @Transactional
+    public void markAsRead(Long roomId, Long memberId) {
+        chatMessageRepository.markMessagesAsRead(roomId, memberId);
     }
 }

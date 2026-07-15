@@ -8,6 +8,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
+import org.springframework.data.jpa.repository.Modifying;
 
 @Repository
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
@@ -23,4 +25,15 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     List<ChatMessage> findByRoomIdOrderByIdDesc(
             @Param("roomId") Long roomId, 
             Pageable pageable);
+
+    // 가장 최근 메시지 1개 조회
+    Optional<ChatMessage> findTopByRoomIdOrderByIdDesc(Long roomId);
+
+    // 안 읽은 메시지 개수 카운트 (상대방이 보낸 메시지 중 isRead = false)
+    long countByRoomIdAndSenderIdNotAndIsReadFalse(Long roomId, Long memberId);
+
+    // 읽음 처리 업데이트 (상대방이 보낸 메시지만 isRead = true로 변경)
+    @Modifying
+    @Query("UPDATE ChatMessage m SET m.isRead = true WHERE m.roomId = :roomId AND m.senderId != :memberId AND m.isRead = false")
+    void markMessagesAsRead(@Param("roomId") Long roomId, @Param("memberId") Long memberId);
 }

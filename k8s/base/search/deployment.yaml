@@ -20,7 +20,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: search
-          image: ghcr.io/prgrms-be-adv-devcourse/search:latest
+          image: ghcr.io/prgrms-be-adv-devcourse/frontal-search:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8087
