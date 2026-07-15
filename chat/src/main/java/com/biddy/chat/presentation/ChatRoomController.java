@@ -32,9 +32,10 @@ public class ChatRoomController {
 
     @GetMapping("/rooms/{roomId}/messages")
     public ResponseEntity<List<ChatMessageResponse>> getMessages(
+            @RequestHeader("X-Member-Id") Long memberId,
             @PathVariable Long roomId,
             @RequestParam(required = false) Long lastMessageId,
             @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(chatRoomService.getMessages(roomId, lastMessageId, size));
+        return ResponseEntity.ok(chatRoomService.getMessages(roomId, memberId, lastMessageId, size));
     }
 }

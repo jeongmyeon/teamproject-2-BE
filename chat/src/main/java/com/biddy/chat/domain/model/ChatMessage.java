@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.LocalDateTime;
 
@@ -32,14 +33,19 @@ public class ChatMessage {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
 
+    @Column(nullable = false)
+    @ColumnDefault("false")
+    private boolean isRead = false;
+
     @CreatedDate
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
     @Builder
-    public ChatMessage(Long roomId, Long senderId, String content) {
+    public ChatMessage(Long roomId, Long senderId, String content, boolean isRead) {
         this.roomId = roomId;
         this.senderId = senderId;
         this.content = content;
+        this.isRead = isRead;
     }
 }

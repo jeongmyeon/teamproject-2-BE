@@ -36,4 +36,8 @@ public class ChatService {
         ChatMessageResponse response = ChatMessageResponse.from(savedMessage);
         redisPublisher.publish(chatTopic, response);
     }
+    @Transactional
+    public void markAsRead(Long roomId, Long memberId) {
+        chatMessageRepository.markMessagesAsRead(roomId, memberId);
+    }
 }
