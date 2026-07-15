@@ -42,6 +42,9 @@ public class JwtAuthenticationGlobalFilter implements GlobalFilter, Ordered {
     // (예: 상품 목록/상세는 비로그인도 보이지만, 로그인 상태면 찜 여부 등을 함께 응답해야 함)
     private static final List<String> OPTIONAL_AUTH_GET_WHITELIST = List.of(
             "/api/products",
+            "/api/v1/auctions",
+            "/api/auctions",
+            "/api/members",
             "/api/members/auth/refresh"
     );
 
