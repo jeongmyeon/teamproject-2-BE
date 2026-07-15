@@ -67,6 +67,6 @@ jobs:
         if: github.event_name == 'push' && success()
         run: |
           cd search
-          docker build -t ghcr.io/${{ github.repository_owner }}/search:latest -t ghcr.io/${{ github.repository_owner }}/search:${{ github.sha }} .
-          docker push ghcr.io/${{ github.repository_owner }}/search:latest
-          docker push ghcr.io/${{ github.repository_owner }}/search:${{ github.sha }}
+          docker build -t ghcr.io/${{ github.repository_owner }}/frontal-search:latest -t ghcr.io/${{ github.repository_owner }}/frontal-search:${{ github.sha }} .
+          docker push ghcr.io/${{ github.repository_owner }}/frontal-search:latest
+          docker push ghcr.io/${{ github.repository_owner }}/frontal-search:${{ github.sha }}
