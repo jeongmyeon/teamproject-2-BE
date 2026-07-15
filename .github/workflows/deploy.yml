@@ -8,6 +8,7 @@ on:
   workflow_run:
     workflows:
       - CI - Product
+      - CI - Search
       - CI - Member
       - CI - Order
       - CI - Auction
@@ -46,6 +47,7 @@ jobs:
           else
             case "${{ github.event.workflow_run.name }}" in
               "CI - Product") DEPLOYMENTS="product" ;;
+              "CI - Search") DEPLOYMENTS="search" ;;
               "CI - Member") DEPLOYMENTS="member" ;;
               "CI - Order") DEPLOYMENTS="order" ;;
               "CI - Auction") DEPLOYMENTS="auction" ;;
@@ -58,7 +60,7 @@ jobs:
           fi
 
           if [ "$DEPLOYMENTS" = "all" ]; then
-            DEPLOYMENTS="config discovery apigateway member product order auction payment chat chatbot"
+            DEPLOYMENTS="config discovery apigateway member product search order auction payment chat chatbot"
           fi
 
           echo "deployments=$DEPLOYMENTS" >> "$GITHUB_OUTPUT"

@@ -1,0 +1,62 @@
+server:
+  port: 8087
+
+api:
+  init: /api
+
+spring:
+  application:
+    name: search-service
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${SEARCH_DB:biddy_search}
+    username: ${POSTGRES_USER:biddy}
+    password: ${POSTGRES_PASSWORD:biddy1234}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    show-sql: true
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+management:
+  health:
+    elasticsearch:
+      enabled: ${ELASTICSEARCH_HEALTH_ENABLED:false}
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+biddy:
+  client:
+    product-service-url: ${PRODUCT_SERVICE_URL:http://localhost:8082}
+  search:
+    keyword-index: ${SEARCH_KEYWORD_INDEX:search-keywords}
+    candidate-size: ${SEARCH_CANDIDATE_SIZE:30}
+    recommendation-size: ${SEARCH_RECOMMENDATION_SIZE:2}
+    history-keyword-size: ${SEARCH_HISTORY_KEYWORD_SIZE:5}
+  embedding:
+    base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+    api-key: ${OPENAI_API_KEY:}
+    model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+    dimensions: ${OPENAI_EMBEDDING_DIMENSIONS:1536}
+  llm:
+    enabled: ${LLM_ENABLED:true}
+    base-url: ${LLM_BASE_URL:https://api.openai.com/v1}
+    api-key: ${LLM_API_KEY:${OPENAI_API_KEY:}}
+    model: ${LLM_MODEL:gpt-4o-mini}

@@ -34,6 +34,7 @@ public class SecurityConfig {
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         // 로그인 필요한 GET (내 찜 목록)
                         .requestMatchers(HttpMethod.GET, "/api/products/liked").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/products/search/vector").permitAll()
                         // 비로그인도 가능한 상품 조회
                         .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/**").permitAll()
                         // 나머지 (등록/수정/삭제/이미지업로드/찜하기 등)는 인증 필요

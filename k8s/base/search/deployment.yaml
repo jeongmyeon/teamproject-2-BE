@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: search
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: search
+  template:
+    metadata:
+      labels:
+        app: search
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8087"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      imagePullSecrets:
+        - name: ghcr-secret
+      containers:
+        - name: search
+          image: ghcr.io/prgrms-be-adv-devcourse/search:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8087
+          envFrom:
+            - configMapRef:
+                name: biddy-common-config
+            - secretRef:
+                name: biddy-secret
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8087
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            timeoutSeconds: 5

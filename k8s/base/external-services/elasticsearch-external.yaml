@@ -1,0 +1,29 @@
+---
+# Service: K8s 내부에서 'elasticsearch:9200'으로 접근
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  namespace: biddy
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 9200
+      targetPort: 9200
+      protocol: TCP
+
+---
+# Endpoint: Docker 호스트 IP를 지정
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: elasticsearch
+  namespace: biddy
+subsets:
+  - addresses:
+      - ip: 10.0.30.99  # AWS EC2 Private IP
+    ports:
+      - name: http
+        port: 9200
+        protocol: TCP

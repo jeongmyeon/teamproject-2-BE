@@ -3,7 +3,7 @@ package com.biddy.productservice.presentation.controller;
 
 import com.biddy.productservice.application.service.ProductImageService;
 import com.biddy.productservice.application.service.ProductLikeService;
-import com.biddy.productservice.application.service.ProductSemanticSearchService;
+import com.biddy.productservice.application.service.ProductVectorSearchService;
 import com.biddy.productservice.application.usecase.ProductCommandUseCase;
 import com.biddy.productservice.application.usecase.ProductQueryUseCase;
 import com.biddy.productservice.domain.model.Product;
@@ -35,7 +35,7 @@ public class ProductController {
     private final ProductQueryUseCase productQueryUseCase;
     private final ProductImageService productImageService;
     private final ProductLikeService productLikeService;
-    private final ProductSemanticSearchService productSemanticSearchService;
+    private final ProductVectorSearchService productVectorSearchService;
 
     @PostMapping
     @Operation(summary = "상품 등록",description = "상품을 새로 등록합니다. 로그인 필요.")
@@ -92,13 +92,12 @@ public class ProductController {
         return productQueryUseCase.getAll();
     }
 
-    @GetMapping("/search/semantic")
-    @Operation(summary = "상품 의미 검색", description = "검색어를 텍스트 임베딩으로 변환한 뒤 pgvector 유사도 검색을 수행합니다.")
-    public List<Product> semanticSearch(
-            @RequestParam String query,
-            @RequestParam(defaultValue = "20") int limit
+    @PostMapping("/search/vector")
+    @Operation(summary = "상품 벡터 후보 조회", description = "Search Service가 전달한 검색어 임베딩으로 유사 상품 후보를 조회합니다.")
+    public List<ProductVectorSearchResponse> vectorSearch(
+            @RequestBody ProductVectorSearchRequest request
     ) {
-        return productSemanticSearchService.search(query, limit);
+        return productVectorSearchService.search(request.queryEmbedding(), request.size());
     }
 
     @GetMapping("/{id}")
