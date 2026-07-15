@@ -225,7 +225,7 @@
 
 ### Spring Boot 메트릭 확인
 - [ ] 각 서비스 `/actuator/prometheus` 엔드포인트 접근 가능
-- [ ] Prometheus Targets에 8개 서비스 등록
+- [ ] Prometheus Targets에 7개 비즈니스 서비스 등록 (Member, Product, Order, Auction, Payment, Search, Chat)
 - [ ] Grafana에서 서비스별 메트릭 조회 가능
 
 ---

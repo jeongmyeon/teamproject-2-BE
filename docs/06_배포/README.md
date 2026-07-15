@@ -167,6 +167,8 @@ Prometheus + Grafana 기반 모니터링 시스템 구축 및 운영
 | Order | 8083 | 주문 서비스 |
 | Auction | 8084 | 경매 서비스 |
 | Payment | 8085 | 결제 서비스 |
+| Search | 8086 | 검색 서비스 |
+| Chat | 8087 | 채팅 서비스 |
 
 ---
 
@@ -176,7 +178,7 @@ Prometheus + Grafana 기반 모니터링 시스템 구축 및 운영
 - **8000:** API Gateway
 - **8761:** Eureka Discovery
 - **8888:** Config Server
-- **8081-8085:** Business Services
+- **8081-8087:** Business Services (Member, Product, Order, Auction, Payment, Search, Chat)
 
 ### 모니터링 포트 (NodePort)
 - **30090:** Prometheus UI
