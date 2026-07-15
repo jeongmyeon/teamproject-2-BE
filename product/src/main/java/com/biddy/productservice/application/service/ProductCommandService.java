@@ -21,6 +21,7 @@ public class ProductCommandService implements ProductCommandUseCase {
 
     private final ProductRepository productRepository;
     private final ProductEventProducer eventProducer;
+    private final ProductEmbeddingRefreshService productEmbeddingRefreshService;
 
     // event 추가
     @Override
@@ -32,6 +33,7 @@ public class ProductCommandService implements ProductCommandUseCase {
                 request.startsAt(), request.endsAt());
 
         Product savedProduct = productRepository.save(product);
+        productEmbeddingRefreshService.refreshAfterCommit(savedProduct);
         //경매 상품이면 Auction 도메인에 발행
         if (savedProduct.getSaleType() == SaleType.AUCTION){
             eventProducer.sendAuctionRegistered(
@@ -60,7 +62,9 @@ public class ProductCommandService implements ProductCommandUseCase {
 
         product.update(request.name(),request.description(),request.price(),request.stock(),
                 request.status(),request.category(),request.brand(),memberId);
-        return productRepository.save(product);
+        Product savedProduct = productRepository.save(product);
+        productEmbeddingRefreshService.refreshAfterCommit(savedProduct);
+        return savedProduct;
     }
 
     @Override

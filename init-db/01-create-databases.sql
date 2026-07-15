@@ -3,6 +3,9 @@ CREATE DATABASE biddy_member;
 CREATE SCHEMA IF NOT EXISTS member_biddy;
 
 CREATE DATABASE biddy_product;
+\connect biddy_product
+CREATE EXTENSION IF NOT EXISTS vector;
+
 CREATE DATABASE biddy_order;
 CREATE DATABASE biddy_auction;
 CREATE DATABASE biddy_payment;

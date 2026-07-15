@@ -36,9 +36,17 @@ CREATE DATABASE biddy_member;
 CREATE SCHEMA IF NOT EXISTS member_biddy;
 
 CREATE DATABASE biddy_product;
+\connect biddy_product
+CREATE EXTENSION IF NOT EXISTS vector;
+
 CREATE DATABASE biddy_order;
 CREATE DATABASE biddy_auction;
 CREATE DATABASE biddy_payment;
+
+CREATE DATABASE biddy_chatbot;
+\connect biddy_chatbot
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE DATABASE biddy_chat;
 EOF
 
 echo "✓ 초기화 스크립트 생성 완료: ~/biddy-docker/init-db/01-create-databases.sql"
@@ -64,7 +72,7 @@ docker run -d \
   -p 5432:5432 \
   -v postgres-data:/var/lib/postgresql/data \
   -v ~/biddy-docker/init-db:/docker-entrypoint-initdb.d \
-  postgres:16-alpine
+  pgvector/pgvector:pg16
 
 echo "  ✓ PostgreSQL 컨테이너 시작 완료"
 sleep 5
@@ -150,16 +158,30 @@ echo "✓ Docker 서비스 시작 완료!"
 echo "=========================================="
 echo ""
 echo "다음 단계:"
-echo "1. K8s 외부 서비스 Endpoint 배포"
-echo "   kubectl apply -k k8s/base/external-services/"
+echo "1. EC2 Private IP가 k8s/base/external-services/*-external.yaml의 Endpoint IP와 같은지 확인"
+echo "   현재 EC2 IP: $EC2_IP"
+echo "   다르면 external-services YAML의 10.0.30.99 값을 $EC2_IP로 수정 후 배포"
 echo ""
-echo "2. K8s 내부 서비스 제거 (StatefulSet/Deployment)"
-echo "   kubectl scale statefulset kafka --replicas=0 -n biddy"
+echo "2. K8s 외부 서비스 Endpoint 배포"
+echo "   cd ~/beadv6_6_frontal_BE"
+echo "   git pull origin develop"
+echo "   kubectl apply -k k8s/base"
+echo ""
+echo "3. K8s 내부 데이터 서비스가 남아있다면 중지"
 echo "   kubectl scale deployment redis --replicas=0 -n biddy"
 echo "   kubectl scale deployment postgres --replicas=0 -n biddy"
+echo "   kubectl scale deployment kafka --replicas=0 -n biddy"
 echo ""
-echo "3. 애플리케이션 Pod 재시작"
+echo "4. biddy-secret 값 확인"
+echo "   POSTGRES_USER=postgres"
+echo "   POSTGRES_PASSWORD=postgres123"
+echo "   OPENAI_API_KEY=<실제 키>"
+echo ""
+echo "5. 애플리케이션 Pod 재시작"
 echo "   kubectl rollout restart deployment -n biddy"
+echo ""
+echo "6. 연결 확인"
+echo "   kubectl get endpoints postgres redis kafka -n biddy -o wide"
 echo ""
 echo "연결 정보:"
 echo "  EC2 IP: $EC2_IP"

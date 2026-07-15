@@ -58,3 +58,11 @@ aws:
   s3:
     bucket: ${AWS_S3_BUCKET:team03-biddy-storage}
     region: ${AWS_S3_REGION:ap-northeast-2}
+
+embedding:
+  openai:
+    enabled: ${PRODUCT_EMBEDDING_ENABLED:true}
+    api-key: ${OPENAI_API_KEY:}
+    base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+    model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+    dimensions: ${OPENAI_EMBEDDING_DIMENSIONS:1536}
