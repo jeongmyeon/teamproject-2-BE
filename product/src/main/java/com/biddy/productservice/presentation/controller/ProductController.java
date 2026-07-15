@@ -1,6 +1,7 @@
 package com.biddy.productservice.presentation.controller;
 
 
+import com.biddy.productservice.application.service.ProductAiSearchService;
 import com.biddy.productservice.application.service.ProductImageService;
 import com.biddy.productservice.application.service.ProductLikeService;
 import com.biddy.productservice.application.service.ProductSemanticSearchService;
@@ -36,6 +37,7 @@ public class ProductController {
     private final ProductImageService productImageService;
     private final ProductLikeService productLikeService;
     private final ProductSemanticSearchService productSemanticSearchService;
+    private final ProductAiSearchService productAiSearchService;
 
     @PostMapping
     @Operation(summary = "상품 등록",description = "상품을 새로 등록합니다. 로그인 필요.")
@@ -99,6 +101,15 @@ public class ProductController {
             @RequestParam(defaultValue = "20") int limit
     ) {
         return productSemanticSearchService.search(query, limit);
+    }
+
+    @GetMapping("/search/ai")
+    @Operation(summary = "상품 AI 검색", description = "pgvector 의미검색 결과 중 LLM이 추천 상품을 골라 상단에 재정렬합니다.")
+    public ProductAiSearchResponse aiSearch(
+            @RequestParam String query,
+            @RequestParam(defaultValue = "5") int limit
+    ) {
+        return productAiSearchService.search(query, limit);
     }
 
     @GetMapping("/{id}")

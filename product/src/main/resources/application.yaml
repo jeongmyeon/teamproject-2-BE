@@ -66,3 +66,10 @@ embedding:
     base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
     model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
     dimensions: ${OPENAI_EMBEDDING_DIMENSIONS:1536}
+
+llm:
+  openai:
+    enabled: ${PRODUCT_LLM_ENABLED:true}
+    api-key: ${OPENAI_API_KEY:}
+    base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+    model: ${OPENAI_CHAT_MODEL:gpt-4o-mini}
