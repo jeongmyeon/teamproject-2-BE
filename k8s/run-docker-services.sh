@@ -21,6 +21,10 @@ if [ -z "$EC2_IP" ]; then
     exit 1
 fi
 
+POSTGRES_USER=${POSTGRES_USER:-biddy}
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-biddy1234}
+POSTGRES_DB=${POSTGRES_DB:-postgres}
+
 # 2. 작업 디렉토리 생성
 echo ""
 echo "[2/6] 작업 디렉토리 설정 중..."
@@ -47,6 +51,7 @@ CREATE DATABASE biddy_chatbot;
 \connect biddy_chatbot
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE DATABASE biddy_chat;
+CREATE DATABASE biddy_search;
 EOF
 
 echo "✓ 초기화 스크립트 생성 완료: ~/biddy-docker/init-db/01-create-databases.sql"
@@ -54,7 +59,7 @@ echo "✓ 초기화 스크립트 생성 완료: ~/biddy-docker/init-db/01-create
 # 4. 기존 컨테이너 정리 (있다면)
 echo ""
 echo "[4/6] 기존 컨테이너 정리 중..."
-docker rm -f biddy-postgres biddy-redis biddy-kafka 2>/dev/null || true
+docker rm -f biddy-postgres biddy-redis biddy-kafka biddy-elasticsearch 2>/dev/null || true
 echo "✓ 기존 컨테이너 정리 완료"
 
 # 5. Docker 컨테이너 실행
@@ -66,9 +71,9 @@ echo "  - PostgreSQL 시작 중..."
 docker run -d \
   --name biddy-postgres \
   --restart unless-stopped \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres123 \
-  -e POSTGRES_DB=postgres \
+  -e POSTGRES_USER=$POSTGRES_USER \
+  -e POSTGRES_PASSWORD=$POSTGRES_PASSWORD \
+  -e POSTGRES_DB=$POSTGRES_DB \
   -p 5432:5432 \
   -v postgres-data:/var/lib/postgresql/data \
   -v ~/biddy-docker/init-db:/docker-entrypoint-initdb.d \
@@ -110,18 +115,44 @@ echo "  ✓ Kafka 컨테이너 시작 완료"
 echo "  ℹ Kafka가 완전히 시작되려면 20-30초 정도 걸립니다..."
 sleep 20
 
+# Elasticsearch
+echo "  - Elasticsearch 시작 중..."
+if command -v sudo > /dev/null 2>&1; then
+  sudo sysctl -w vm.max_map_count=262144 > /dev/null
+else
+  sysctl -w vm.max_map_count=262144 > /dev/null
+fi
+docker run -d \
+  --name biddy-elasticsearch \
+  --restart unless-stopped \
+  -e discovery.type=single-node \
+  -e xpack.security.enabled=false \
+  -e ES_JAVA_OPTS="-Xms512m -Xmx512m" \
+  -p 9200:9200 \
+  -v elasticsearch-data:/usr/share/elasticsearch/data \
+  --memory=1g \
+  --cpus=1 \
+  docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+
+echo "  ✓ Elasticsearch 컨테이너 시작 완료"
+echo "  ℹ Elasticsearch가 완전히 시작되려면 30-60초 정도 걸립니다..."
+sleep 30
+
 # 6. 연결 테스트
 echo ""
 echo "[6/6] 연결 테스트 중..."
 
 # PostgreSQL 테스트
 echo "  - PostgreSQL 테스트..."
-if docker exec biddy-postgres pg_isready -U postgres > /dev/null 2>&1; then
+if docker exec biddy-postgres pg_isready -U "$POSTGRES_USER" > /dev/null 2>&1; then
     echo "    ✓ PostgreSQL 연결 성공"
 
     # 데이터베이스 생성 확인
     echo "  - 데이터베이스 목록 확인..."
-    docker exec biddy-postgres psql -U postgres -c "\l" | grep biddy_ && \
+    docker exec biddy-postgres psql -U "$POSTGRES_USER" -tc "SELECT 1 FROM pg_database WHERE datname = 'biddy_search'" | grep -q 1 || \
+        docker exec biddy-postgres psql -U "$POSTGRES_USER" -c "CREATE DATABASE biddy_search"
+    docker exec biddy-postgres psql -U "$POSTGRES_USER" -d biddy_product -c "CREATE EXTENSION IF NOT EXISTS vector;" > /dev/null
+    docker exec biddy-postgres psql -U "$POSTGRES_USER" -c "\l" | grep biddy_ && \
         echo "    ✓ 모든 데이터베이스 생성 확인" || \
         echo "    ⚠ 데이터베이스 생성 확인 필요"
 else
@@ -143,6 +174,14 @@ if docker exec biddy-kafka /opt/kafka/bin/kafka-broker-api-versions.sh \
     echo "    ✓ Kafka 연결 성공"
 else
     echo "    ⚠ Kafka가 아직 시작 중이거나 연결 실패 (30초 후 재시도 권장)"
+fi
+
+# Elasticsearch 테스트
+echo "  - Elasticsearch 테스트..."
+if curl -fsS "http://localhost:9200/_cluster/health" > /dev/null 2>&1; then
+    echo "    ✓ Elasticsearch 연결 성공"
+else
+    echo "    ⚠ Elasticsearch가 아직 시작 중이거나 연결 실패 (30초 후 재시도 권장)"
 fi
 
 # 최종 상태 확인
@@ -171,21 +210,23 @@ echo "3. K8s 내부 데이터 서비스가 남아있다면 중지"
 echo "   kubectl scale deployment redis --replicas=0 -n biddy"
 echo "   kubectl scale deployment postgres --replicas=0 -n biddy"
 echo "   kubectl scale deployment kafka --replicas=0 -n biddy"
+echo "   kubectl delete deployment elasticsearch -n biddy --ignore-not-found"
 echo ""
 echo "4. biddy-secret 값 확인"
-echo "   POSTGRES_USER=postgres"
-echo "   POSTGRES_PASSWORD=postgres123"
+echo "   POSTGRES_USER=$POSTGRES_USER"
+echo "   POSTGRES_PASSWORD=$POSTGRES_PASSWORD"
 echo "   OPENAI_API_KEY=<실제 키>"
 echo ""
 echo "5. 애플리케이션 Pod 재시작"
 echo "   kubectl rollout restart deployment -n biddy"
 echo ""
 echo "6. 연결 확인"
-echo "   kubectl get endpoints postgres redis kafka -n biddy -o wide"
+echo "   kubectl get endpoints postgres redis kafka elasticsearch -n biddy -o wide"
 echo ""
 echo "연결 정보:"
 echo "  EC2 IP: $EC2_IP"
-echo "  PostgreSQL: $EC2_IP:5432 (user: postgres, password: postgres123)"
+echo "  PostgreSQL: $EC2_IP:5432 (user: $POSTGRES_USER, password: $POSTGRES_PASSWORD)"
 echo "  Redis: $EC2_IP:6379"
 echo "  Kafka: $EC2_IP:9092"
+echo "  Elasticsearch: $EC2_IP:9200"
 echo ""

@@ -8,6 +8,7 @@ data:
   POSTGRES_DB: postgres
   MEMBER_DB: biddy_member
   PRODUCT_DB: biddy_product
+  SEARCH_DB: biddy_search
   ORDER_DB: biddy_order
   AUCTION_DB: biddy_auction
   PAYMENT_DB: biddy_payment
@@ -20,6 +21,12 @@ data:
   SPRING_CLOUD_CONFIG_URI: http://config:8888
   ORDER_SERVICE_URL: http://order:8083
   PRODUCT_SERVICE_URL: http://product:8082
+  SEARCH_SERVICE_URL: http://search:8087
+  SEARCH_CANDIDATE_SIZE: "30"
+  SEARCH_RECOMMENDATION_SIZE: "2"
+  SEARCH_HISTORY_KEYWORD_SIZE: "5"
+  LLM_ENABLED: "true"
+  ELASTICSEARCH_URIS: http://elasticsearch:9200
   TOSS_PAYMENTS_BASE_URL: https://api.tosspayments.com
   TZ: Asia/Seoul
   JAVA_TOOL_OPTIONS: -Duser.timezone=Asia/Seoul

@@ -279,6 +279,29 @@ services:
       TZ: Asia/Seoul
       JAVA_TOOL_OPTIONS: -Duser.timezone=Asia/Seoul
 
+  search:
+    build: ./search
+    container_name: biddy-search
+    ports:
+      - "8087:8087"
+    depends_on:
+      discovery:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery:8761/eureka/
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      SEARCH_DB: ${SEARCH_DB:-biddy_search}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PRODUCT_SERVICE_URL: http://product:8082
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LLM_ENABLED: ${LLM_ENABLED:-true}
+      TZ: Asia/Seoul
+      JAVA_TOOL_OPTIONS: -Duser.timezone=Asia/Seoul
+
 volumes:
   postgres-data:
   redis-data:

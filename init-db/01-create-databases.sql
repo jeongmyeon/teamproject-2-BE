@@ -14,3 +14,4 @@ CREATE DATABASE biddy_chatbot;
 \connect biddy_chatbot
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE DATABASE biddy_chat;
+CREATE DATABASE biddy_search;

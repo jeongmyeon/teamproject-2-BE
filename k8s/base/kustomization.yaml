@@ -9,6 +9,7 @@ resources:
   - external-services/postgres-external.yaml
   - external-services/redis-external.yaml
   - external-services/kafka-external.yaml
+  - external-services/elasticsearch-external.yaml
   - discovery/deployment.yaml
   - discovery/service.yaml
   - config/deployment.yaml
@@ -22,6 +23,8 @@ resources:
   - product/deployment.yaml
   - product/service.yaml
   - product/networkpolicy.yaml
+  - search/deployment.yaml
+  - search/service.yaml
   - order/deployment.yaml
   - order/service.yaml
   - order/networkpolicy.yaml
