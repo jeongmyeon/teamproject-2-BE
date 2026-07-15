@@ -32,7 +32,10 @@ public class JwtAuthenticationGlobalFilter implements GlobalFilter, Ordered {
             "/api/members/login",
             "/api/members/email",
             "/api/members/auth/refresh",
+            "/api/members/",  // 회원 닉네임 조회 등
             "/api/chatbot",
+            "/api/v1/auctions",  // 경매 목록/상세 조회
+            "/api/auctions",  // 경매 레거시 경로
             "/v3/api-docs",
             "/swagger-ui",
             "/api/ws-chat"
