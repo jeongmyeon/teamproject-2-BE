@@ -24,3 +24,6 @@ k8s-aws/
 k6-tests/
 monitoring/
 scripts/
+
+# 쉘 스크립트 (로컬 실행용)
+*.sh
