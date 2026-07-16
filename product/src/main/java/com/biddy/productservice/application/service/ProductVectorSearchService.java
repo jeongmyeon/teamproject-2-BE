@@ -30,7 +30,15 @@ public class ProductVectorSearchService {
                 product.getStatus(),
                 product.getSellerId(),
                 product.getStock(),
+                firstImageUrl(product),
                 null
         );
+    }
+
+    private String firstImageUrl(Product product) {
+        if (product.getImageUrls() == null || product.getImageUrls().isEmpty()) {
+            return null;
+        }
+        return product.getImageUrls().getFirst();
     }
 }
