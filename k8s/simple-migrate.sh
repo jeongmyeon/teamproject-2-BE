@@ -24,12 +24,26 @@ echo ""
 # 1. 워커 노드에 셋업 스크립트 전송
 echo "[1/3] 워커 노드에 셋업 파일 전송..."
 
+# 스크립트 디렉토리 확인
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+
+echo "스크립트 위치: $SCRIPT_DIR"
+echo "프로젝트 루트: $PROJECT_ROOT"
+
 # 임시 디렉토리에 파일 준비
 TEMP_DIR="/tmp/biddy-worker-setup"
 mkdir -p $TEMP_DIR
 
 # Docker Compose 파일 복사
-cp k8s/worker-node-docker-compose.yml $TEMP_DIR/docker-compose.yml
+if [ -f "$SCRIPT_DIR/worker-node-docker-compose.yml" ]; then
+    cp "$SCRIPT_DIR/worker-node-docker-compose.yml" $TEMP_DIR/docker-compose.yml
+    echo "✅ Docker Compose 파일 복사 완료"
+else
+    echo "❌ worker-node-docker-compose.yml 파일을 찾을 수 없습니다."
+    echo "위치: $SCRIPT_DIR/worker-node-docker-compose.yml"
+    exit 1
+fi
 
 # 셋업 스크립트 생성 (간소화 버전)
 cat > $TEMP_DIR/setup.sh << 'SETUP_SCRIPT'
