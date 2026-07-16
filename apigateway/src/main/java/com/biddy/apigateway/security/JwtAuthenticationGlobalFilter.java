@@ -32,10 +32,8 @@ public class JwtAuthenticationGlobalFilter implements GlobalFilter, Ordered {
             "/api/members/login",
             "/api/members/email",
             "/api/members/auth/refresh",
-            "/api/members/",  // 회원 닉네임 조회 등
             "/api/chatbot",
-            "/api/v1/auctions",  // 경매 목록/상세 조회
-            "/api/auctions",  // 경매 레거시 경로
+            "/api/v1/auctions",  // 경매 목록/상세/결과 조회
             "/v3/api-docs",
             "/swagger-ui",
             "/api/ws-chat"
@@ -44,7 +42,8 @@ public class JwtAuthenticationGlobalFilter implements GlobalFilter, Ordered {
     // 비로그인도 조회 가능하지만, 로그인 상태면 회원 정보를 같이 넘겨줘야 하는 경로
     // (예: 상품 목록/상세는 비로그인도 보이지만, 로그인 상태면 찜 여부 등을 함께 응답해야 함)
     private static final List<String> OPTIONAL_AUTH_GET_WHITELIST = List.of(
-            "/api/products",
+            "/api/products",  // 상품 목록/상세 (찜 여부 포함)
+            "/api/members/",  // 회원 닉네임 조회 (GET /api/members/{id}/nickname) - Member SecurityConfig에서 최종 검증
             "/api/members/auth/refresh"
     );
 
