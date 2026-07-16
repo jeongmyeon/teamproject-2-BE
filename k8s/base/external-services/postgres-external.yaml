@@ -22,7 +22,7 @@ metadata:
   namespace: biddy
 subsets:
   - addresses:
-      - ip: 10.0.30.99  # AWS EC2 Private IP
+      - ip: 10.0.19.195  # AWS EC2 Worker Node Private IP
     ports:
       - name: postgres
         port: 5432
