@@ -19,3 +19,8 @@ Thumbs.db
 k8s-aws/
 
 
+
+# 로컬 테스트 및 모니터링 파일
+k6-tests/
+monitoring/
+scripts/

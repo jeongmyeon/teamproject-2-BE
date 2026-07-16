@@ -8,10 +8,23 @@
 
 ### 🚀 배포 가이드 (순서대로 읽기 권장)
 
-#### 1. [실행 가이드](./01_실행가이드.md)
-- 로컬 개발 환경 실행
+#### 🏠 로컬 실행 (개발 환경)
+
+##### 1. [실행 가이드](./01_실행가이드.md) ⭐
+- **대상:** 로컬 개발 환경에서 서비스 실행
+- **방법:** Docker Compose 또는 IntelliJ 직접 실행
 - IntelliJ IDEA Compound Run Configuration
 - 서비스 실행 순서 및 확인
+- 트러블슈팅
+
+##### 2. [Docker 로컬 실행 가이드](./05_Docker_로컬_실행_가이드.md)
+- **대상:** Docker Compose를 사용한 로컬 환경 구성
+- 전체 서비스 한 번에 실행
+- 개별 서비스 선택 실행
+
+---
+
+#### ☁️ AWS 클라우드 배포 (프로덕션 환경)
 
 #### 2. [Kubernetes 도입 가이드](./02_Kubernetes_도입_가이드.md)
 - Kubernetes 개념 및 아키텍처
@@ -167,6 +180,8 @@ Prometheus + Grafana 기반 모니터링 시스템 구축 및 운영
 | Order | 8083 | 주문 서비스 |
 | Auction | 8084 | 경매 서비스 |
 | Payment | 8085 | 결제 서비스 |
+| Search | 8086 | 검색 서비스 |
+| Chat | 8087 | 채팅 서비스 |
 
 ---
 
@@ -176,7 +191,7 @@ Prometheus + Grafana 기반 모니터링 시스템 구축 및 운영
 - **8000:** API Gateway
 - **8761:** Eureka Discovery
 - **8888:** Config Server
-- **8081-8085:** Business Services
+- **8081-8087:** Business Services (Member, Product, Order, Auction, Payment, Search, Chat)
 
 ### 모니터링 포트 (NodePort)
 - **30090:** Prometheus UI
