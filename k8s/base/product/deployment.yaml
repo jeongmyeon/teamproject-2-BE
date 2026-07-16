@@ -44,4 +44,12 @@ spec:
             initialDelaySeconds: 45
             periodSeconds: 10
             timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8082
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
 
