@@ -9,6 +9,7 @@ public record ProductSearchResult(
         String status,
         Long sellerId,
         Integer stock,
+        String imageUrl,
         Double similarityScore
 ) {
 }

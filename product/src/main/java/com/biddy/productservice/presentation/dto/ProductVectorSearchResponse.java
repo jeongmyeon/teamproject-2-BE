@@ -9,6 +9,7 @@ public record ProductVectorSearchResponse(
         String status,
         Long sellerId,
         Integer stock,
+        String imageUrl,
         Double similarityScore
 ) {
 }
