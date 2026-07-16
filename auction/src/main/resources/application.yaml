@@ -51,3 +51,10 @@ management:
 
 jwt:
   secret: ${JWT_SECRET:biddy-default-jwt-secret-key-for-development-only}
+
+# Transactional Outbox Pattern Configuration
+outbox:
+  scheduler:
+    delay: ${OUTBOX_SCHEDULER_DELAY:5000}  # 스케줄러 실행 주기 (ms)
+    max-retry-count: ${OUTBOX_MAX_RETRY_COUNT:5}  # 최대 재시도 횟수
+    send-timeout-seconds: ${OUTBOX_SEND_TIMEOUT:10}  # Kafka 발행 타임아웃 (초)
