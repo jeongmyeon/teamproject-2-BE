@@ -102,7 +102,7 @@ docker compose logs auction | grep "Warm-up"   # 특정 키워드
 ```bash
 # 이메일 인증 레코드 생성
 docker exec biddy-postgres psql -U biddy -d biddy_member -c "
-INSERT INTO member_biddy.email_verification (email, token, expired_at, verified_at, created_at) VALUES
+INSERT INTO public.email_verification (email, token, expired_at, verified_at, created_at) VALUES
 ('test@biddy.com', 'token1', NOW() + INTERVAL '1 day', NOW(), NOW()),
 ('buyer2@biddy.com', 'token2', NOW() + INTERVAL '1 day', NOW(), NOW());
 "
@@ -242,7 +242,7 @@ docker exec biddy-redis redis-cli GET "watch:auction:A-EAR01:count"  # 경매 �
 ```bash
 # DB 직접 조회
 docker exec biddy-postgres psql -U biddy -d biddy_auction -c "SELECT auction_id, product_id, status FROM auction;"
-docker exec biddy-postgres psql -U biddy -d biddy_member -c "SELECT id, email, nickname FROM member_biddy.member;"
+docker exec biddy-postgres psql -U biddy -d biddy_member -c "SELECT id, email, nickname FROM public.member;"
 ```
 
 ---

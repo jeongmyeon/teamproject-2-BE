@@ -15,7 +15,6 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        default_schema: member_biddy
         format_sql: true
     show-sql: true
   kafka:

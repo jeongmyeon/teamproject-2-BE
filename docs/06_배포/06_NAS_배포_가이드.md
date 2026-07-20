@@ -234,7 +234,7 @@ Synology: 제어판 → 외부 액세스 → 라우터 구성
 ```bash
 # 이메일 인증 레코드
 docker exec biddy-postgres psql -U biddy -d biddy_member -c "
-INSERT INTO member_biddy.email_verification (email, token, expired_at, verified_at, created_at) VALUES
+INSERT INTO public.email_verification (email, token, expired_at, verified_at, created_at) VALUES
 ('user1@biddy.com', 't1', NOW() + INTERVAL '1 day', NOW(), NOW()),
 ('user2@biddy.com', 't2', NOW() + INTERVAL '1 day', NOW(), NOW()),
 ('user3@biddy.com', 't3', NOW() + INTERVAL '1 day', NOW(), NOW());
@@ -249,7 +249,7 @@ done
 
 # 확인
 docker exec biddy-postgres psql -U biddy -d biddy_member \
-  -c "SELECT id, email, nickname FROM member_biddy.member;"
+  -c "SELECT id, email, nickname FROM public.member;"
 ```
 
 ### 9-2. 경매 데이터
