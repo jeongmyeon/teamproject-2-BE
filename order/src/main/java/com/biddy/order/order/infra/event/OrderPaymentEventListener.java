@@ -30,8 +30,10 @@ public class OrderPaymentEventListener {
             log.info("Order status updated to PAID for orderId: {}", event.orderId());
         } catch (JsonProcessingException e) {
             log.error("Failed to deserialize PaymentCompletedEvent", e);
+            throw new RuntimeException("Failed to deserialize PaymentCompletedEvent", e);
         } catch (Exception e) {
             log.error("Error processing PaymentCompletedEvent", e);
+            throw new RuntimeException("Error processing PaymentCompletedEvent", e);
         }
     }
 
@@ -44,8 +46,10 @@ public class OrderPaymentEventListener {
             log.info("Order status updated to CANCELLED for orderId: {}", event.orderId());
         } catch (JsonProcessingException e) {
             log.error("Failed to deserialize PaymentFailedEvent", e);
+            throw new RuntimeException("Failed to deserialize PaymentFailedEvent", e);
         } catch (Exception e) {
             log.error("Error processing PaymentFailedEvent", e);
+            throw new RuntimeException("Error processing PaymentFailedEvent", e);
         }
     }
 }

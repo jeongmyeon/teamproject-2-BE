@@ -35,8 +35,10 @@ public class OrderStockEventListener {
             log.info("Order status updated to CANCELLED due to stock deduction failure. orderId: {}", event.orderId());
         } catch (JsonProcessingException e) {
             log.error("Failed to deserialize StockDeductFailedEvent", e);
+            throw new RuntimeException("Failed to deserialize StockDeductFailedEvent", e);
         } catch (Exception e) {
             log.error("Error processing StockDeductFailedEvent", e);
+            throw new RuntimeException("Error processing StockDeductFailedEvent", e);
         }
     }
 }
