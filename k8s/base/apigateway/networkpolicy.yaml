@@ -1,9 +1,4 @@
-# apigateway는 외부에서 유일하게 직접 접근되는 진입점이다.
-# ingress-nginx-controller가 hostNetwork: true 로 떠 있고, kube-proxy가
-# ClusterIP로 가는 트래픽을 MASQUERADE할 때 노드의 실제 IP가 아니라
-# Calico tunl0(IPIP 터널) 인터페이스의 IP를 소스로 사용한다.
-# 그래서 노드 IP(10.0.x.x)가 아니라 각 노드의 tunl0 IP를 ipBlock으로 허용한다.
-# (마스터/워커 둘 중 어디로 재스케줄되어도 막히지 않도록 둘 다 등록)
+# apigateway는 Traefik이 실행되는 kube-system 네임스페이스에서만 외부 요청을 받는다.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -16,10 +11,9 @@ spec:
     - Ingress
   ingress:
     - from:
-        - ipBlock:
-            cidr: 192.168.216.192/32   # 마스터 노드 tunl0
-        - ipBlock:
-            cidr: 192.168.89.0/32      # 워커 노드 tunl0
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
       ports:
         - protocol: TCP
           port: 8000

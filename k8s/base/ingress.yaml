@@ -3,16 +3,15 @@ kind: Ingress
 metadata:
   name: biddy-api
   annotations:
-    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
-  ingressClassName: nginx
+  ingressClassName: traefik
   tls:
     - hosts:
-        - 43.200.204.191.nip.io
+        - 43.202.187.240.nip.io
       secretName: biddy-api-tls
   rules:
-    - host: 43.200.204.191.nip.io
+    - host: 43.202.187.240.nip.io
       http:
         paths:
           - path: /
