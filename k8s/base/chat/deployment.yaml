@@ -5,6 +5,8 @@ metadata:
   namespace: biddy
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: chat
@@ -30,6 +32,13 @@ spec:
                 name: biddy-common-config
             - secretRef:
                 name: biddy-secret
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8086
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
           readinessProbe:
             httpGet:
               path: /actuator/health
@@ -37,4 +46,3 @@ spec:
             initialDelaySeconds: 45
             periodSeconds: 10
             timeoutSeconds: 5
-
