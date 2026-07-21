@@ -18,7 +18,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -46,8 +45,8 @@ public class ProductController {
             @ApiResponse(responseCode="401",description="인증 필요")
     })
     public ResponseEntity<Product> create(
+            @RequestHeader("X-Member-Id") Long memberId,
             @Valid @RequestBody ProductCreateRequest request){
-        Long memberId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
         Product response = productCommandUseCase.create(request, memberId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -62,8 +61,8 @@ public class ProductController {
     })
     public ResponseEntity<Product> update(
             @PathVariable Long id,
+            @RequestHeader("X-Member-Id") Long memberId,
             @Valid @RequestBody ProductUpdateRequest request){
-        Long memberId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
         return ResponseEntity.ok(productCommandUseCase.update(id, request, memberId));
     }
 
@@ -73,8 +72,7 @@ public class ProductController {
             @ApiResponse(responseCode = "204", description = "삭제 성공"),
             @ApiResponse(responseCode = "404", description = "상품 없음")
     })
-    public ResponseEntity<Void> delete(@PathVariable Long id){
-        Long memberId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
+    public ResponseEntity<Void> delete(@PathVariable Long id, @RequestHeader("X-Member-Id") Long memberId){
         productCommandUseCase.delete(id, memberId);
         return ResponseEntity.noContent().build();
     }
@@ -134,16 +132,14 @@ public class ProductController {
 
     @PostMapping("/{id}/like")
     @Operation(summary = "찜하기", description = "상품을 찜합니다. 로그인 필요.")
-    public ResponseEntity<Void> like(@PathVariable Long id) {
-        Long memberId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
+    public ResponseEntity<Void> like(@PathVariable Long id, @RequestHeader("X-Member-Id") Long memberId) {
         productLikeService.like(id, memberId);
         return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/{id}/like")
     @Operation(summary = "찜 취소", description = "찜을 취소합니다. 로그인 필요.")
-    public ResponseEntity<Void> unlike(@PathVariable Long id) {
-        Long memberId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
+    public ResponseEntity<Void> unlike(@PathVariable Long id, @RequestHeader("X-Member-Id") Long memberId) {
         productLikeService.unlike(id, memberId);
         return ResponseEntity.noContent().build();
     }
@@ -156,19 +152,18 @@ public class ProductController {
 
     @GetMapping("/{id}/is-liked")
     @Operation(summary = "찜 여부 조회", description = "비로그인이면 false 반환")
-    public ResponseEntity<Map<String, Boolean>> isLiked(@PathVariable Long id) {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) {
+    public ResponseEntity<Map<String, Boolean>> isLiked(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-Member-Id", required = false) Long memberId) {
+        if (memberId == null) {
             return ResponseEntity.ok(Map.of("liked", false));
         }
-        Long memberId = Long.parseLong(auth.getName());
         return ResponseEntity.ok(Map.of("liked", productLikeService.isLiked(id, memberId)));
     }
 
     @GetMapping("/liked")
     @Operation(summary = "내 찜 목록 조회", description = "로그인한 회원의 찜 목록을 반환합니다.")
-    public List<Product> getLikedProducts() {
-        Long memberId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
+    public List<Product> getLikedProducts(@RequestHeader("X-Member-Id") Long memberId) {
         return productLikeService.getLikedProducts(memberId);
     }
 

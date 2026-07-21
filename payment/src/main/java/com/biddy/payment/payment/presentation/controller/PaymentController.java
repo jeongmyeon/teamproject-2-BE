@@ -6,7 +6,6 @@ import com.biddy.payment.payment.presentation.request.PaymentCreateRequest;
 import com.biddy.payment.payment.presentation.response.PaymentResponse;
 import com.biddy.payment.payment.application.PaymentService;
 import jakarta.validation.Valid;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,7 +26,7 @@ public class PaymentController {
 
     @PostMapping
     public ApiResponse<PaymentResponse> create(
-            @AuthenticationPrincipal Long memberId,
+            @RequestHeader("X-Member-Id") Long memberId,
             @RequestHeader("X-Member-Role") String memberRole,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody PaymentCreateRequest request
@@ -40,7 +39,7 @@ public class PaymentController {
 
     @GetMapping("/{id}")
     public ApiResponse<PaymentResponse> get(
-            @AuthenticationPrincipal Long memberId,
+            @RequestHeader("X-Member-Id") Long memberId,
             @PathVariable Long id
     ) {
         return ApiResponse.ok(paymentService.get(id, memberId));
@@ -48,7 +47,7 @@ public class PaymentController {
 
     @PostMapping("/{id}/cancel")
     public ApiResponse<PaymentResponse> cancel(
-            @AuthenticationPrincipal Long memberId,
+            @RequestHeader("X-Member-Id") Long memberId,
             @PathVariable Long id,
             @Valid @RequestBody PaymentCancelRequest request
     ) {
@@ -57,7 +56,7 @@ public class PaymentController {
 
     @PostMapping("/{id}/refund")
     public ApiResponse<PaymentResponse> refund(
-            @AuthenticationPrincipal Long memberId,
+            @RequestHeader("X-Member-Id") Long memberId,
             @PathVariable Long id,
             @Valid @RequestBody PaymentCancelRequest request
     ) {

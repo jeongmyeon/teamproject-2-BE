@@ -12,7 +12,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -44,7 +43,7 @@ public class AuctionController {
     @GetMapping("/{auctionId}")
     public ResponseEntity<AuctionDetailResponse> getAuctionDetail(
             @Parameter(description = "경매 ID (예: A-FNF97)") @PathVariable String auctionId,
-            @AuthenticationPrincipal Long memberId
+            @RequestHeader(value = "X-Member-Id", required = false) Long memberId
     ) {
         AuctionDetailResponse response = AuctionDetailResponse.from(
                 auctionUseCase.getAuctionDetail(auctionId, memberId));
@@ -55,7 +54,7 @@ public class AuctionController {
     @PostMapping("/{auctionId}/close")
     public ResponseEntity<Void> closeAuction(
             @Parameter(description = "경매 ID") @PathVariable String auctionId,
-            @AuthenticationPrincipal Long memberId
+            @RequestHeader("X-Member-Id") Long memberId
     ) {
         auctionUseCase.closeAuctionBySeller(auctionId, memberId);
         return ResponseEntity.ok().build();
