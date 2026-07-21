@@ -20,10 +20,7 @@ k8s-aws/
 
 
 
-# 로컬 테스트 및 모니터링 파일
+# 로컬 테스트 및 개발 파일
 k6-tests/
-monitoring/
 scripts/
-
-# 쉘 스크립트 (로컬 실행용)
-*.sh
+/monitoring/
