@@ -15,10 +15,10 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,16 +35,20 @@ public class SearchController {
 
     @PostMapping
     @Operation(summary = "상품 의미 검색", description = "검색어를 임베딩한 뒤 Product Service에 유사 상품 후보 조회를 요청합니다.")
-    public SearchResponse search(@Valid @RequestBody SearchRequest request) {
-        return productSearchService.search(request, currentMemberIdOrNull());
+    public SearchResponse search(
+            @Valid @RequestBody SearchRequest request,
+            @RequestHeader(value = "X-Member-Id", required = false) Long memberId
+    ) {
+        return productSearchService.search(request, memberId);
     }
 
     @GetMapping("/recommendations/history")
     @Operation(summary = "내 검색 기록 기반 추천", description = "회원의 검색 기록 빈도를 가중치로 사용해 추천 상품을 반환합니다.")
     public SearchHistoryRecommendationResponse historyRecommendations(
+            @RequestHeader("X-Member-Id") Long memberId,
             @RequestParam(defaultValue = "10") @Positive int size
     ) {
-        return memberSearchHistoryService.recommend(currentMemberId(), size);
+        return memberSearchHistoryService.recommend(memberId, size);
     }
 
     @GetMapping("/suggestions")
@@ -77,19 +81,4 @@ public class SearchController {
         return new EmbeddingDebugResponse(query, embedding.size(), embedding);
     }
 
-    private Long currentMemberIdOrNull() {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) {
-            return null;
-        }
-        return Long.parseLong(auth.getName());
-    }
-
-    private Long currentMemberId() {
-        Long memberId = currentMemberIdOrNull();
-        if (memberId == null) {
-            throw new IllegalStateException("로그인이 필요합니다.");
-        }
-        return memberId;
-    }
 }

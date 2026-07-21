@@ -8,7 +8,6 @@ import com.biddy.memberservice.application.service.MemberService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -19,19 +18,19 @@ public class MemberController {
     private final MemberService memberService;
 
     @GetMapping("/me")
-    public ResponseEntity<MemberResponse> getMyInfo(@AuthenticationPrincipal Long memberId) {
+    public ResponseEntity<MemberResponse> getMyInfo(@RequestHeader("X-Member-Id") Long memberId) {
         return ResponseEntity.ok(memberService.getMyInfo(memberId));
     }
 
     @PatchMapping("/me/nickname")
-    public ResponseEntity<Void> updateNickname(@AuthenticationPrincipal Long memberId,
+    public ResponseEntity<Void> updateNickname(@RequestHeader("X-Member-Id") Long memberId,
                                                @Valid @RequestBody UpdateNicknameRequest request) {
         memberService.updateNickname(memberId, request.getNickname());
         return ResponseEntity.ok().build();
     }
 
     @PatchMapping("/me/password")
-    public ResponseEntity<Void> updatePassword(@AuthenticationPrincipal Long memberId,
+    public ResponseEntity<Void> updatePassword(@RequestHeader("X-Member-Id") Long memberId,
                                                @Valid @RequestBody UpdatePasswordRequest request) {
         memberService.updatePassword(memberId, request.getCurrentPassword(),
                 request.getNewPassword());
@@ -39,7 +38,7 @@ public class MemberController {
     }
 
     @DeleteMapping("/me")
-    public ResponseEntity<Void> withdraw(@AuthenticationPrincipal Long memberId) {
+    public ResponseEntity<Void> withdraw(@RequestHeader("X-Member-Id") Long memberId) {
         memberService.withdraw(memberId);
         return ResponseEntity.ok().build();
     }

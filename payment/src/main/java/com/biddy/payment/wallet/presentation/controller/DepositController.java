@@ -10,7 +10,6 @@ import com.biddy.payment.wallet.presentation.request.DepositWithdrawRequest;
 import com.biddy.payment.wallet.application.DepositService;
 import jakarta.validation.Valid;
 import java.util.List;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,7 +31,7 @@ public class DepositController {
 
     @PostMapping("/charge")
     public ApiResponse<DepositBalanceResponse> charge(
-            @AuthenticationPrincipal Long memberId,
+            @RequestHeader("X-Member-Id") Long memberId,
             @Valid @RequestBody DepositChargeRequest request
     ) {
         return ApiResponse.ok(depositService.charge(request.withUserId(memberId)), "예치금 충전이 완료되었습니다.");
@@ -40,7 +39,7 @@ public class DepositController {
 
     @PostMapping("/charge/cancel")
     public ApiResponse<DepositBalanceResponse> cancelCharge(
-            @AuthenticationPrincipal Long memberId,
+            @RequestHeader("X-Member-Id") Long memberId,
             @Valid @RequestBody DepositChargeCancelRequest request
     ) {
         return ApiResponse.ok(depositService.cancelCharge(request.withUserId(memberId)), "예치금 충전 취소가 완료되었습니다.");
@@ -48,7 +47,7 @@ public class DepositController {
 
     @PostMapping("/withdraw")
     public ApiResponse<DepositBalanceResponse> withdraw(
-            @AuthenticationPrincipal Long memberId,
+            @RequestHeader("X-Member-Id") Long memberId,
             @Valid @RequestBody DepositWithdrawRequest request
     ) {
         return ApiResponse.ok(depositService.withdraw(request.withUserId(memberId)), "예치금 출금 신청이 완료되었습니다.");
@@ -61,7 +60,7 @@ public class DepositController {
 
     @GetMapping("/balance")
     public ApiResponse<DepositBalanceResponse> getBalance(
-            @AuthenticationPrincipal Long memberId,
+            @RequestHeader("X-Member-Id") Long memberId,
             @RequestHeader(value = "X-Member-Role", required = false) String memberRole,
             @RequestParam(value = "userId", required = false) Long userId
     ) {
@@ -71,7 +70,7 @@ public class DepositController {
 
     @GetMapping("/transactions")
     public ApiResponse<List<DepositTransactionResponse>> getTransactions(
-            @AuthenticationPrincipal Long memberId,
+            @RequestHeader("X-Member-Id") Long memberId,
             @RequestParam(value = "size", defaultValue = "30") int size
     ) {
         return ApiResponse.ok(depositService.getTransactions(memberId, size));

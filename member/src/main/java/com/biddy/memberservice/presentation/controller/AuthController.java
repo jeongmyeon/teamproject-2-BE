@@ -9,7 +9,6 @@ import com.biddy.memberservice.application.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -37,7 +36,7 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@AuthenticationPrincipal Long memberId,
+    public ResponseEntity<Void> logout(@RequestHeader("X-Member-Id") Long memberId,
                                         @RequestHeader("Authorization") String authorizationHeader) {
         String accessToken = authorizationHeader.startsWith("Bearer ")
                 ? authorizationHeader.substring(7)

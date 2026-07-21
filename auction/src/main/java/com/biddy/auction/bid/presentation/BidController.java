@@ -14,7 +14,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -32,7 +31,7 @@ public class BidController {
     @PostMapping
     public ResponseEntity<PlaceBidResponse> placeBid(
             @Parameter(description = "경매 ID") @PathVariable String auctionId,
-            @AuthenticationPrincipal Long bidderId,
+            @RequestHeader("X-Member-Id") Long bidderId,
             @RequestBody PlaceBidRequest request
     ) {
         PlaceBidCommand command = new PlaceBidCommand(auctionId, bidderId, request.amount());

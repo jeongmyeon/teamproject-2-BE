@@ -8,7 +8,6 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -25,7 +24,7 @@ public class WatchController {
     @GetMapping
     public ResponseEntity<Map<String, Boolean>> isWatching(
             @PathVariable String auctionId,
-            @AuthenticationPrincipal Long memberId
+            @RequestHeader(value = "X-Member-Id", required = false) Long memberId
     ) {
         boolean watching = watchUseCase.isWatching(auctionId, memberId);
         return ResponseEntity.ok(Map.of("watching", watching));
@@ -35,7 +34,7 @@ public class WatchController {
     @PostMapping
     public ResponseEntity<ToggleWatchResponse> toggleWatch(
             @Parameter(description = "경매 ID") @PathVariable String auctionId,
-            @AuthenticationPrincipal Long memberId
+            @RequestHeader("X-Member-Id") Long memberId
     ) {
         ToggleWatchResult result = watchUseCase.toggleWatch(auctionId, memberId);
         return ResponseEntity.ok(ToggleWatchResponse.from(result));
