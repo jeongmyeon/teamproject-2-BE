@@ -1,0 +1,123 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-alert-rules
+  namespace: biddy-monitoring
+data:
+  alert.rules.yml: |
+    groups:
+    - name: biddy-critical-alerts
+      interval: 30s
+      rules:
+      # Pod Down 알림
+      - alert: PodDown
+        expr: up{job="biddy-services"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: devops
+        annotations:
+          summary: "Pod {{ $labels.kubernetes_pod_name }} is down"
+          description: "Pod {{ $labels.kubernetes_pod_name }} in namespace {{ $labels.namespace }} has been down for more than 2 minutes."
+
+      # 메모리 사용률 90% 이상
+      - alert: HighMemoryUsage
+        expr: (container_memory_working_set_bytes{namespace="biddy-services"} / container_spec_memory_limit_bytes{namespace="biddy-services"}) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "High memory usage on {{ $labels.pod }}"
+          description: "Pod {{ $labels.pod }} memory usage is above 90% (current: {{ $value | humanize }}%)"
+
+      # CPU 사용률 90% 이상
+      - alert: HighCpuUsage
+        expr: (rate(container_cpu_usage_seconds_total{namespace="biddy-services"}[5m]) * 100) > 90
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "High CPU usage on {{ $labels.pod }}"
+          description: "Pod {{ $labels.pod }} CPU usage is above 90% (current: {{ $value | humanize }}%)"
+
+      # HTTP 5xx 에러율 5% 이상
+      - alert: HighErrorRate
+        expr: (sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) by (application) / sum(rate(http_server_requests_seconds_count[5m])) by (application)) * 100 > 5
+        for: 3m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "High 5xx error rate on {{ $labels.application }}"
+          description: "Service {{ $labels.application }} has 5xx error rate above 5% (current: {{ $value | humanize }}%)"
+
+      # 평균 응답시간 1초 이상
+      - alert: HighLatency
+        expr: (rate(http_server_requests_seconds_sum[5m]) / rate(http_server_requests_seconds_count[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High latency on {{ $labels.application }}"
+          description: "Service {{ $labels.application }} average response time is above 1s (current: {{ $value | humanize }}s)"
+
+      # Worker 노드 메모리 95% 이상
+      - alert: NodeMemoryPressure
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 95
+        for: 5m
+        labels:
+          severity: critical
+          team: infra
+        annotations:
+          summary: "Node memory pressure on {{ $labels.instance }}"
+          description: "Node {{ $labels.instance }} memory usage is above 95% (current: {{ $value | humanize }}%)"
+
+      # 디스크 사용률 90% 이상
+      - alert: HighDiskUsage
+        expr: (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          team: infra
+        annotations:
+          summary: "High disk usage on {{ $labels.instance }}"
+          description: "Node {{ $labels.instance }} disk usage is above 90% (current: {{ $value | humanize }}%)"
+
+      # Prometheus 타겟 다운
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 3m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "Prometheus target {{ $labels.job }} is down"
+          description: "Target {{ $labels.instance }} of job {{ $labels.job }} has been down for more than 3 minutes."
+
+    - name: biddy-monitoring-health
+      interval: 1m
+      rules:
+      # Prometheus 자체 상태 확인
+      - alert: PrometheusNotReady
+        expr: up{job="prometheus"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: devops
+        annotations:
+          summary: "Prometheus is not ready"
+          description: "Prometheus monitoring system is down for more than 2 minutes."
+
+      # Grafana 다운
+      - alert: GrafanaDown
+        expr: up{job="grafana"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "Grafana is down"
+          description: "Grafana dashboard is unavailable for more than 2 minutes."

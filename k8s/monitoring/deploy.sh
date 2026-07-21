@@ -43,7 +43,12 @@ echo ""
 # Wait for namespace to be ready
 sleep 2
 
-# 2. Deploy Prometheus
+# 2. Deploy Alert Rules
+echo "🚨 Deploying Alert Rules..."
+kubectl apply -f alerting-rules.yaml
+echo ""
+
+# 3. Deploy Prometheus
 echo "📊 Deploying Prometheus..."
 kubectl apply -f prometheus.yaml
 echo ""
@@ -56,7 +61,7 @@ echo "🔍 Checking Prometheus PVC status..."
 kubectl get pvc -n biddy-monitoring prometheus-pvc
 echo ""
 
-# 3. Deploy Grafana
+# 4. Deploy Grafana
 echo "📈 Deploying Grafana..."
 kubectl apply -f grafana.yaml
 echo ""

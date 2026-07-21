@@ -13,6 +13,7 @@ K3s 클러스터를 위한 Prometheus + Grafana 모니터링 시스템
 - **데이터 보관 기간**: 15일
 - **스크래핑 간격**: 15초
 - **쿼리 제한**: 동시 10개, 샘플 5천만개
+- **Alert Rules**: 10개 자동 설정 ⭐
 - **접속**: http://node-ip:30090
 
 ### Grafana
@@ -23,6 +24,18 @@ K3s 클러스터를 위한 Prometheus + Grafana 모니터링 시스템
 - **스토리지**: 10GB (local-path, 삭제 방지)
 - **기본 계정**: admin / admin1234
 - **접속**: http://node-ip:30300
+
+### Alert Rules (자동 설정) ⭐
+1. **PodDown** - 서비스 다운 2분 이상
+2. **HighMemoryUsage** - 메모리 90% 이상 5분
+3. **HighCpuUsage** - CPU 90% 이상 5분
+4. **HighErrorRate** - 5xx 에러율 5% 이상
+5. **HighLatency** - 응답시간 1초 이상
+6. **NodeMemoryPressure** - Worker 메모리 95% 이상
+7. **HighDiskUsage** - 디스크 90% 이상
+8. **PrometheusTargetDown** - 타겟 다운 3분
+9. **PrometheusNotReady** - Prometheus 다운
+10. **GrafanaDown** - Grafana 다운
 
 ## 🎯 모니터링 대상 서비스
 

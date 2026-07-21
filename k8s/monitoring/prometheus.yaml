@@ -9,6 +9,10 @@ data:
       scrape_interval: 15s
       evaluation_interval: 15s
 
+    # Alert Rules 로드
+    rule_files:
+      - '/etc/prometheus/rules/*.rules.yml'
+
     scrape_configs:
       # Kubernetes API Server
       - job_name: 'kubernetes-apiservers'
@@ -145,6 +149,8 @@ spec:
         volumeMounts:
         - name: config
           mountPath: /etc/prometheus
+        - name: alert-rules
+          mountPath: /etc/prometheus/rules
         - name: storage
           mountPath: /prometheus
         livenessProbe:
@@ -170,6 +176,9 @@ spec:
       - name: config
         configMap:
           name: prometheus-config
+      - name: alert-rules
+        configMap:
+          name: prometheus-alert-rules
       - name: storage
         persistentVolumeClaim:
           claimName: prometheus-pvc
