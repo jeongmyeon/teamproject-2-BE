@@ -10,7 +10,7 @@ spec:
   ports:
     - name: postgres
       port: 5432
-      targetPort: 5432
+      targetPort: 15432
       protocol: TCP
 
 ---
@@ -22,8 +22,8 @@ metadata:
   namespace: biddy
 subsets:
   - addresses:
-      - ip: 10.0.19.195  # AWS EC2 Worker Node Private IP
+      - ip: 1.234.196.160
     ports:
       - name: postgres
-        port: 5432
+        port: 15432
         protocol: TCP

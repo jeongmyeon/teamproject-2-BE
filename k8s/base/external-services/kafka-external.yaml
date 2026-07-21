@@ -23,7 +23,7 @@ metadata:
   namespace: biddy
 subsets:
   - addresses:
-      - ip: 10.0.19.195  # AWS EC2 Worker Node Private IP
+      - ip: 1.234.196.160
     ports:
       - name: broker
         port: 9092
