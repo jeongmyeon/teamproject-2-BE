@@ -22,7 +22,7 @@ metadata:
   namespace: biddy
 subsets:
   - addresses:
-      - ip: 1.234.196.160
+      - ip: ${EXTERNAL_DB_IP}
     ports:
       - name: postgres
         port: 15432
