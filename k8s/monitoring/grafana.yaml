@@ -19,6 +19,9 @@ kind: PersistentVolumeClaim
 metadata:
   name: grafana-pvc
   namespace: biddy-monitoring
+  annotations:
+    # PVC 삭제 방지 (대시보드 및 설정 보존)
+    "helm.sh/resource-policy": keep
 spec:
   accessModes:
     - ReadWriteOnce
@@ -110,7 +113,8 @@ spec:
     - name: http
       port: 3000
       targetPort: 3000
-  type: LoadBalancer
+      nodePort: 30300
+  type: NodePort
 ---
 apiVersion: v1
 kind: Secret
