@@ -9,7 +9,7 @@ spec:
   type: ClusterIP
   ports:
     - name: postgres
-      port: 5432
+      port: 15432
       targetPort: 15432
       protocol: TCP
 
