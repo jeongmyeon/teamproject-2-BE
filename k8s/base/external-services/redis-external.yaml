@@ -22,7 +22,7 @@ metadata:
   namespace: biddy
 subsets:
   - addresses:
-      - ip: 10.0.19.195  # AWS EC2 Worker Node Private IP
+      - ip: ${EXTERNAL_DB_IP}
     ports:
       - name: redis
         port: 6379
