@@ -4,7 +4,7 @@ metadata:
   name: biddy-common-config
 data:
   POSTGRES_HOST: postgres
-  POSTGRES_PORT: "15432"
+  POSTGRES_PORT: "5432"
   POSTGRES_DB: postgres
   MEMBER_DB: biddy_member
   PRODUCT_DB: biddy_product
