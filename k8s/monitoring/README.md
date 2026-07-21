@@ -6,6 +6,7 @@ K3s 클러스터를 위한 Prometheus + Grafana 모니터링 시스템
 
 ### Prometheus
 - **버전**: v2.48.0
+- **Replicas**: 1개 (고정, 메모리 절약)
 - **메모리**: 1GB (요청) / 2GB (제한)
 - **CPU**: 500m (요청) / 1000m (제한)
 - **스토리지**: 20GB (local-path)
@@ -14,6 +15,7 @@ K3s 클러스터를 위한 Prometheus + Grafana 모니터링 시스템
 
 ### Grafana
 - **버전**: 10.2.2
+- **Replicas**: 1개 (고정, 메모리 절약)
 - **메모리**: 512MB (요청) / 1GB (제한)
 - **CPU**: 250m (요청) / 500m (제한)
 - **스토리지**: 10GB (local-path)

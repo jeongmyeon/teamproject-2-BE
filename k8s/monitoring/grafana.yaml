@@ -34,6 +34,10 @@ metadata:
   namespace: biddy-monitoring
   labels:
     app: grafana
+  annotations:
+    # 메모리 절약을 위해 반드시 1개 Pod만 유지
+    # HPA(HorizontalPodAutoscaler) 사용 금지
+    deployment.kubernetes.io/max-replicas: "1"
 spec:
   replicas: 1
   selector:
