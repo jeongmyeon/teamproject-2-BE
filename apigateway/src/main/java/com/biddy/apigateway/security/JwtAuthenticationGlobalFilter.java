@@ -34,6 +34,7 @@ public class JwtAuthenticationGlobalFilter implements GlobalFilter, Ordered {
             "/api/members/signup",
             "/api/members/login",
             "/api/members/reissue",
+            "/api/members/email", // 이메일 인증 발송 및 검증 허용
             "/api/chatbot",
             "/v3/api-docs",
             "/swagger-ui",
