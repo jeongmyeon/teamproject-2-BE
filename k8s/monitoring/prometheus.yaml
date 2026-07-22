@@ -64,32 +64,6 @@ data:
         - source_labels: [__meta_kubernetes_pod_name]
           action: replace
           target_label: kubernetes_pod_name
-
-      # Spring Boot Actuator Endpoints
-      - job_name: 'biddy-services'
-        kubernetes_sd_configs:
-        - role: pod
-          namespaces:
-            names:
-            - biddy
-        relabel_configs:
-        - source_labels: [__meta_kubernetes_pod_label_app]
-          action: keep
-          regex: (discovery|config|apigateway|member|product|order|auction|payment|chatbot|search)
-        - source_labels: [__meta_kubernetes_pod_ip]
-          action: replace
-          target_label: __address__
-          replacement: $1:8080
-        - source_labels: [__meta_kubernetes_pod_label_app]
-          action: replace
-          target_label: application
-        - source_labels: [__meta_kubernetes_namespace]
-          action: replace
-          target_label: namespace
-        metric_relabel_configs:
-        - source_labels: [__name__]
-          regex: 'jvm.*|http.*|process.*|system.*'
-          action: keep
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
