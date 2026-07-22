@@ -57,22 +57,16 @@ data:
       # Node Exporter (host CPU, memory, disk, network)
       - job_name: 'node-exporter'
         kubernetes_sd_configs:
-        - role: pod
-          namespaces:
-            names:
-              - biddy-monitoring
+        - role: node
         relabel_configs:
-        - source_labels: [__meta_kubernetes_pod_label_app]
-          action: keep
-          regex: node-exporter
-        - source_labels: [__meta_kubernetes_pod_container_port_name]
-          action: keep
-          regex: metrics
-        - source_labels: [__meta_kubernetes_pod_phase]
-          action: keep
-          regex: Running
-        - source_labels: [__meta_kubernetes_pod_node_name]
-          target_label: kubernetes_node
+        - source_labels: [__address__]
+          regex: '(.*):10250'
+          replacement: '${1}:9100'
+          target_label: __address__
+        - source_labels: [__meta_kubernetes_node_name]
+          target_label: instance
+        - action: labelmap
+          regex: __meta_kubernetes_node_label_(.+)
 
       # Kubernetes object state (Deployment, Pod, Node, PVC, etc.)
       - job_name: 'kube-state-metrics'
@@ -135,6 +129,9 @@ metadata:
     deployment.kubernetes.io/max-replicas: "1"
 spec:
   replicas: 1
+  # 단일 RWO PVC의 TSDB를 두 Prometheus 프로세스가 동시에 열지 않도록 한다.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: prometheus
