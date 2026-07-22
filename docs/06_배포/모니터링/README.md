@@ -1,248 +1,287 @@
-# 모니터링 시스템 가이드
+# K3s 모니터링 시스템 가이드
 
-> Kubernetes 클러스터 및 Spring Boot 애플리케이션 모니터링을 위한 전체 가이드
+> K3s Worker 노드에서 실행되는 Prometheus + Grafana 모니터링 스택
 
----
-
-## 📚 문서 목록 (순서대로 읽기)
-
-### 📖 전체 설치 가이드 (처음부터 설치하는 경우)
-
-#### 1️⃣ [모니터링 완전 가이드](./01_모니터링_완전_가이드.md)
-- **대상:** Prometheus + Grafana 설치부터 시작하는 경우
-- **소요 시간:** 20-30분
-- **내용:**
-  - 모니터링 시스템 아키텍처
-  - Kubernetes에 Prometheus/Grafana 설치
-  - 리소스 요구사항 및 확인
-  - 설치 검증 및 문제 해결
-
-#### 2️⃣ [Spring Boot Prometheus 설정 가이드](./02_Spring_Boot_Prometheus_설정_가이드.md)
-- **대상:** Spring Boot 서비스에 메트릭 수집 설정
-- **소요 시간:** 10-15분
-- **내용:**
-  - build.gradle 의존성 추가
-  - application.yaml 설정
-  - Kubernetes Deployment annotations
-  - 메트릭 확인 방법
+**업데이트:** 2026-07-22
+**버전:** 2.0 (K3s Worker 배포)
 
 ---
 
-### 🚀 빠른 시작 (이미 설치 완료된 경우)
+## 🚀 빠른 시작 (5분)
 
-#### 3️⃣ [Grafana 빠른 시작 (5분)](./03_Grafana_빠른_시작.md) ⭐
-- **대상:** 빠르게 Grafana 대시보드를 설정하고 싶은 경우
-- **소요 시간:** 5분
-- **내용:**
-  - Grafana 로그인
-  - Prometheus 연결
-  - 필수 대시보드 3개 임포트
+### ⚡ 바로 시작하기
+👉 **[지금_바로_적용하기.md](./지금_바로_적용하기.md)** ⭐ **가장 빠른 방법!**
+
+5분만에 Worker 노드에 모니터링 시스템을 배포하고 Grafana 대시보드까지 완료!
 
 ---
 
-### 🔧 고급 설정 (커스터마이징 필요 시)
+## 📚 문서 목록
 
-#### 4️⃣ [Grafana 완전 가이드](./04_Grafana_완전_가이드.md)
-- **대상:** Grafana 대시보드 고급 설정 및 커스터마이징
-- **소요 시간:** 30분+
-- **내용:**
-  - 데이터소스 연결 상세
-  - 대시보드 임포트 (11개 추천 대시보드)
-  - 커스텀 대시보드 생성
-  - 주요 메트릭 쿼리 50+ 예시
-  - 알람 설정
-  - 문제 해결
+### 1️⃣ 필수 가이드
 
----
+| 문서 | 설명 | 소요시간 |
+|------|------|----------|
+| **[지금_바로_적용하기.md](./지금_바로_적용하기.md)** ⭐ | Worker 노드 배포 5분 완성 가이드 | 5분 |
+| [02_Grafana_대시보드_설정_가이드.md](./02_Grafana_대시보드_설정_가이드.md) | 대시보드 Import 및 설정 | 10분 |
+| [03_알림_설정_가이드.md](./03_알림_설정_가이드.md) | Slack/Discord 알림 연동 | 10분 |
+| [04_문제해결_가이드.md](./04_문제해결_가이드.md) | 트러블슈팅 | - |
 
-### ✅ 확인 및 검증
+### 2️⃣ 참고 가이드 (선택)
 
-#### 5️⃣ [모니터링 확인 가이드](./05_모니터링_확인_가이드.md) ⭐
-- **대상:** 설치된 모니터링 시스템이 정상 작동하는지 확인
-- **소요 시간:** 10-15분
-- **내용:**
-  - Prometheus 상태 확인 및 Targets 검증
-  - Grafana 대시보드 데이터 확인
-  - Spring Boot 서비스별 메트릭 확인
-  - Node Exporter, kube-state-metrics 확인
-  - 전체 시스템 헬스체크 스크립트
+| 문서 | 설명 |
+|------|------|
+| [01_모니터링_완전_가이드.md](./01_모니터링_완전_가이드.md) | 상세 아키텍처 및 이론 |
+| [02_Spring_Boot_Prometheus_설정_가이드.md](./02_Spring_Boot_Prometheus_설정_가이드.md) | 앱 메트릭 설정 (이미 완료됨) |
+| [05_모니터링_확인_가이드.md](./05_모니터링_확인_가이드.md) | 시스템 검증 |
 
 ---
 
-## 🗺️ 사용 시나리오별 가이드
+## 🏗️ 아키텍처 (K3s 환경)
 
-### 시나리오 1: 처음부터 전체 설치
 ```
-1. 01_모니터링_완전_가이드.md (Prometheus/Grafana 설치)
+┌─────────────────────────────────────────────────────────────┐
+│  Master 노드 (kubectl 명령 실행)                             │
+│  - K3s Control Plane                                         │
+│  - SSH로 접속하여 배포 명령 실행                              │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         │ kubectl apply
+                         ↓
+┌─────────────────────────────────────────────────────────────┐
+│  Worker 노드 (Pod 실행)                                      │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  biddy-monitoring Namespace                          │  │
+│  │                                                       │  │
+│  │  ┌─────────────┐        ┌─────────────┐             │  │
+│  │  │ Prometheus  │───────→│  Grafana    │             │  │
+│  │  │   (메트릭)   │        │ (대시보드)  │             │  │
+│  │  │  :30090     │        │   :30300    │             │  │
+│  │  └──────┬──────┘        └─────────────┘             │  │
+│  │         │                                            │  │
+│  └─────────┼────────────────────────────────────────────┘  │
+│            │                                               │
+│            │ 메트릭 수집                                   │
+│            ↓                                               │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  Spring Boot Services (biddy-services)               │  │
+│  │  - member, product, order, auction, payment          │  │
+│  │  - chatbot, search                                   │  │
+│  │  → /actuator/prometheus (포트 8080)                   │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                              │
+│  메모리: 5GB → 6.5-7GB (85-92%)                              │
+│  Swap: 2GB 추가 필수 ⚠️                                       │
+└─────────────────────────────────────────────────────────────┘
+                         │
+                         │ NodePort 접속
+                         ↓
+                 브라우저 (개발자 PC)
+         http://<worker-ip>:30300 (Grafana)
+         http://<worker-ip>:30090 (Prometheus)
+```
+
+---
+
+## 📊 구성 요소
+
+### Prometheus (메트릭 수집)
+- **버전:** v2.48.0
+- **Replicas:** 1개 고정 (메모리 절약)
+- **메모리:** 1GB ~ 2GB
+- **스토리지:** 20GB (15일 보관)
+- **Alert Rules:** 10개 자동 설정 🚨
+- **포트:** 30090 (NodePort)
+- **접속:** `http://<worker-ip>:30090`
+
+### Grafana (시각화)
+- **버전:** 10.2.2
+- **Replicas:** 1개 고정
+- **메모리:** 512MB ~ 1GB
+- **스토리지:** 10GB
+- **계정:** admin / admin1234
+- **포트:** 30300 (NodePort)
+- **접속:** `http://<worker-ip>:30300`
+
+### 자동 알림 (Alert Rules) 🚨
+1. **PodDown** - 서비스 다운 2분 이상
+2. **HighMemoryUsage** - 메모리 90% 이상
+3. **HighCpuUsage** - CPU 90% 이상
+4. **HighErrorRate** - 5xx 에러율 5% 이상
+5. **HighLatency** - 응답시간 1초 이상
+6. **NodeMemoryPressure** - Worker 메모리 95% 이상
+7. **HighDiskUsage** - 디스크 90% 이상
+8. **PrometheusTargetDown** - 타겟 다운
+9. **PrometheusNotReady** - Prometheus 다운
+10. **GrafanaDown** - Grafana 다운
+
+---
+
+## 🎯 모니터링 대상
+
+### Spring Boot 서비스 (11개)
+- discovery (Eureka)
+- config (Config Server)
+- apigateway (Gateway)
+- member, product, order
+- auction, payment
+- chatbot, search ✨ NEW
+- recommendation
+
+### Kubernetes 리소스
+- Nodes (Master, Worker)
+- Pods (전체 네임스페이스)
+- Deployments, Services
+- PVC, ConfigMap
+
+### 인프라 메트릭
+- CPU, Memory, Disk
+- Network I/O
+- Process 상태
+
+---
+
+## 🔧 시스템 요구사항
+
+### Worker 노드
+- **메모리:** 7.6GB (현재 5GB 사용 → 6.5-7GB 예상)
+- **Swap:** 2GB **필수** ⚠️
+- **디스크:** 30GB 여유 공간
+- **CPU:** 4 vCPU
+
+### Master 노드
+- kubectl 명령 실행용
+- Pod는 배포되지 않음
+
+---
+
+## 📖 사용 시나리오
+
+### 시나리오 1: 처음 배포 (가장 일반적)
+```bash
+1. 지금_바로_적용하기.md 따라 5분만에 배포
    ↓
-2. 02_Spring_Boot_Prometheus_설정_가이드.md (앱 메트릭 설정)
+2. Grafana 대시보드 Import (4개 추천)
    ↓
-3. 03_Grafana_빠른_시작.md (대시보드 설정 - 5분)
+3. Slack/Discord 알림 연동 (선택)
 ```
 
-### 시나리오 2: 이미 설치됨, Grafana만 설정
-```
-03_Grafana_빠른_시작.md (5분만에 완료!)
-```
-
-### 시나리오 3: 설치 완료 후 검증
-```
-1. 05_모니터링_확인_가이드.md (전체 시스템 확인)
+### 시나리오 2: 알림만 설정
+```bash
+1. Prometheus에서 Alert 확인
+   http://<worker-ip>:30090/alerts
    ↓
-2. 문제 발견 시 해당 가이드 참고
+2. 03_알림_설정_가이드.md 참고
+   - Slack Webhook 연동
+   - Discord Webhook 연동
 ```
 
-### 시나리오 4: 고급 설정 및 커스터마이징
-```
-1. 03_Grafana_빠른_시작.md (기본 대시보드)
-   ↓
-2. 04_Grafana_완전_가이드.md (커스텀 대시보드, 알람 등)
-```
-
----
-
-## 🏗️ 모니터링 아키텍처
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  Kubernetes 클러스터                                     │
-│                                                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │ Spring Boot  │  │ Spring Boot  │  │ Spring Boot  │  │
-│  │   Service    │  │   Service    │  │   Service    │  │
-│  │              │  │              │  │              │  │
-│  │ /actuator/   │  │ /actuator/   │  │ /actuator/   │  │
-│  │ prometheus   │  │ prometheus   │  │ prometheus   │  │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  │
-│         │                 │                 │           │
-│         └─────────────────┼─────────────────┘           │
-│                           │                             │
-│                           ↓                             │
-│                  ┌─────────────────┐                    │
-│                  │   Prometheus    │                    │
-│                  │  (메트릭 수집)   │                    │
-│                  └────────┬────────┘                    │
-│                           │                             │
-│                           ↓                             │
-│                  ┌─────────────────┐                    │
-│                  │    Grafana      │                    │
-│                  │ (대시보드 시각화)│                    │
-│                  └─────────────────┘                    │
-│                           │                             │
-└───────────────────────────┼─────────────────────────────┘
-                            │
-                            ↓
-                    브라우저로 접속
-              http://<워커노드IP>:30300
+### 시나리오 3: 문제 해결
+```bash
+1. 04_문제해결_가이드.md 확인
+   - Pod 상태 확인
+   - 메모리 부족
+   - Swap 설정
+   - 타겟 다운
 ```
 
 ---
 
-## 📊 수집되는 메트릭
+## 🌐 접속 정보
 
-### 인프라 메트릭 (Node Exporter)
-- ✅ CPU 사용률
-- ✅ 메모리 사용률
-- ✅ 디스크 I/O
-- ✅ 네트워크 트래픽
+### Grafana (대시보드)
+```
+URL: http://<worker-node-ip>:30300
+Username: admin
+Password: admin1234
+```
 
-### Kubernetes 메트릭 (kube-state-metrics)
-- ✅ Pod 상태 (Running, Pending, Failed)
-- ✅ Deployment 상태
-- ✅ Node 상태
-- ✅ 리소스 요청/제한
+### Prometheus (메트릭)
+```
+URL: http://<worker-node-ip>:30090
+Targets: http://<worker-node-ip>:30090/targets
+Alerts: http://<worker-node-ip>:30090/alerts
+```
 
-### Spring Boot 메트릭 (Micrometer)
-- ✅ JVM 힙 메모리
-- ✅ GC (Garbage Collection)
-- ✅ 스레드 수
-- ✅ HTTP 요청 (처리율, 레이턴시, 에러율)
-- ✅ HikariCP 커넥션 풀
-- ✅ Kafka 프로듀서/컨슈머
+### Worker IP 확인 방법
+```bash
+# Master 노드에서 실행
+kubectl get nodes -o wide
 
----
-
-## 🔧 설치 요구사항
-
-### 리소스
-- **CPU:** 최소 2 vCPU (권장 4 vCPU)
-- **메모리:** 최소 4GB (권장 8GB)
-- **디스크:** 여유 공간 10GB 이상
-
-### 환경
-- **Kubernetes:** v1.28+
-- **Spring Boot:** 3.x
-- **Java:** 21
+# 또는
+kubectl get svc -n biddy-monitoring grafana
+```
 
 ---
 
-## 🚨 문제 해결
+## ✅ 체크리스트
 
-### Prometheus 연결 안 됨
-→ [Grafana_완전_가이드.md - 문제 해결 섹션](./Grafana_완전_가이드.md#9-문제-해결)
-
-### 대시보드에 "No data" 표시
-→ [Grafana_완전_가이드.md - 문제 해결 섹션](./Grafana_완전_가이드.md#9-문제-해결)
-
-### Spring Boot 메트릭 수집 안 됨
-→ [Spring_Boot_Prometheus_설정_가이드.md - 문제 해결](./Spring_Boot_Prometheus_설정_가이드.md#문제-해결)
-
----
-
-## 📌 빠른 링크
-
-### 접속 URL
-- **Prometheus:** `http://<워커노드IP>:30090`
-- **Grafana:** `http://<워커노드IP>:30300`
-  - Username: `admin`
-  - Password: `admin123`
-
-### 추천 Grafana 대시보드 ID
-| ID | 이름 | 용도 |
-|----|------|------|
-| **1860** | Node Exporter Full | 서버 모니터링 |
-| **6417** | Kubernetes Cluster | K8s 클러스터 |
-| **11378** | Spring Boot Statistics | 앱 모니터링 |
-| 4701 | JVM (Micrometer) | JVM 상세 |
-| 12900 | Spring Boot APM | HTTP 성능 |
-| 11085 | HikariCP | DB 커넥션 풀 |
-
----
-
-## 🎯 체크리스트
-
-### 설치 완료 확인
+### 배포 완료 확인
+- [ ] Worker 노드에 Swap 2GB 추가
+- [ ] `kubectl apply -f namespace.yaml` 성공
 - [ ] Prometheus Pod Running
 - [ ] Grafana Pod Running
-- [ ] Node Exporter DaemonSet 실행
-- [ ] kube-state-metrics Pod Running
-- [ ] Prometheus Targets 확인 (`http://<워커노드IP>:30090/targets`)
+- [ ] PVC 2개 Bound 상태
 
-### Grafana 설정 완료 확인
-- [ ] Prometheus 데이터소스 연결
-- [ ] 필수 대시보드 3개 임포트
+### 모니터링 동작 확인
+- [ ] Prometheus Targets Up (http://워커IP:30090/targets)
+- [ ] Grafana 로그인 성공 (http://워커IP:30300)
+- [ ] Grafana 대시보드 4개 Import
 - [ ] 메트릭 데이터 표시 확인
 
-### Spring Boot 메트릭 확인
-- [ ] 각 서비스 `/actuator/prometheus` 엔드포인트 접근 가능
-- [ ] Prometheus Targets에 7개 비즈니스 서비스 등록 (Member, Product, Order, Auction, Payment, Search, Chat)
-- [ ] Grafana에서 서비스별 메트릭 조회 가능
+### 알림 설정 확인
+- [ ] Prometheus Alerts 페이지 확인
+- [ ] Slack/Discord Webhook 연동 (선택)
+- [ ] 테스트 알림 전송 성공
 
 ---
 
-## 📚 관련 문서
+## 🚨 빠른 문제 해결
 
-### 상위 문서
-- [../README.md](../README.md) - 전체 배포 가이드
+### Pod가 Pending 상태
+```bash
+# PVC 상태 확인
+kubectl get pvc -n biddy-monitoring
 
-### 참고 자료
-- [Prometheus 공식 문서](https://prometheus.io/docs/)
-- [Grafana 공식 문서](https://grafana.com/docs/)
-- [Spring Boot Actuator](https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html)
-- [Grafana 대시보드 갤러리](https://grafana.com/grafana/dashboards/)
+# local-path provisioner 확인
+kubectl get pods -n kube-system | grep local-path
+```
+
+### 메모리 부족 (OOMKilled)
+```bash
+# Worker 노드에 Swap 추가 (필수!)
+ssh worker-node
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+```
+
+### 대시보드에 "No data"
+```bash
+# Prometheus Targets 확인
+curl http://<worker-ip>:30090/targets
+
+# Spring Boot 메트릭 확인
+kubectl exec -it <pod-name> -n biddy-services -- curl localhost:8080/actuator/prometheus
+```
 
 ---
 
-**작성일:** 2026-07-09
-**버전:** 1.0
-**관리:** DevOps Team
+## 📚 관련 링크
+
+### 공식 문서
+- [Prometheus 문서](https://prometheus.io/docs/)
+- [Grafana 문서](https://grafana.com/docs/)
+- [K3s 문서](https://docs.k3s.io/)
+
+### Grafana 대시보드
+- [대시보드 갤러리](https://grafana.com/grafana/dashboards/)
+- 추천 ID: 1860, 6417, 11378, 4701
+
+---
+
+**문서 버전:** 2.0
+**최종 업데이트:** 2026-07-22
+**담당:** DevOps Team

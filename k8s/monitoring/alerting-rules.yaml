@@ -9,27 +9,46 @@ data:
     - name: biddy-critical-alerts
       interval: 30s
       rules:
-      # 메모리 사용률 90% 이상
-      - alert: HighMemoryUsage
-        expr: (container_memory_working_set_bytes{namespace="biddy"} / container_spec_memory_limit_bytes{namespace="biddy"}) * 100 > 90
-        for: 5m
+      # Pod Down 알림
+      - alert: PodDown
+        expr: up{job="biddy-services"} == 0
+        for: 2m
         labels:
-          severity: warning
+          severity: critical
           team: devops
         annotations:
-          summary: "High memory usage on {{ $labels.pod }}"
-          description: "Pod {{ $labels.pod }} memory usage is above 90% (current: {{ $value | humanize }}%)"
+          summary: "Pod {{ $labels.kubernetes_pod_name }} is down"
+          description: "Pod {{ $labels.kubernetes_pod_name }} in namespace {{ $labels.namespace }} has been down for more than 2 minutes."
 
-      # CPU 사용률 90% 이상
-      - alert: HighCpuUsage
-        expr: (rate(container_cpu_usage_seconds_total{namespace="biddy"}[5m]) * 100) > 90
+      # 메모리 사용률 90% 이상 (애플리케이션 컨테이너만, pause 제외)
+      - alert: HighMemoryUsage
+        expr: |
+          (
+            container_memory_working_set_bytes{namespace="biddy", container!="", container!="POD", image!~".*pause.*"}
+            /
+            container_spec_memory_limit_bytes{namespace="biddy", container!="", container!="POD", image!~".*pause.*"} > 0
+          ) * 100 > 90
         for: 5m
         labels:
           severity: warning
           team: devops
         annotations:
-          summary: "High CPU usage on {{ $labels.pod }}"
-          description: "Pod {{ $labels.pod }} CPU usage is above 90% (current: {{ $value | humanize }}%)"
+          summary: "High memory usage on {{ $labels.pod }}/{{ $labels.container }}"
+          description: "Container {{ $labels.container }} in pod {{ $labels.pod }} memory usage is above 90%"
+
+      # CPU 사용률 90% 이상 (애플리케이션 컨테이너만, pause 제외)
+      - alert: HighCpuUsage
+        expr: |
+          (
+            rate(container_cpu_usage_seconds_total{namespace="biddy", container!="", container!="POD", image!~".*pause.*"}[5m]) * 100
+          ) > 90
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "High CPU usage on {{ $labels.pod }}/{{ $labels.container }}"
+          description: "Container {{ $labels.container }} in pod {{ $labels.pod }} CPU usage is above 90%"
 
       # HTTP 5xx 에러율 5% 이상
       - alert: HighErrorRate

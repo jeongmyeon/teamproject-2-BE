@@ -1,0 +1,124 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: biddy-monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  spring-boot-dashboard.json: |
+    {
+      "dashboard": {
+        "title": "Spring Boot Services",
+        "tags": ["spring-boot", "jvm", "actuator"],
+        "timezone": "browser",
+        "schemaVersion": 16,
+        "version": 0,
+        "refresh": "30s",
+        "panels": [
+          {
+            "title": "JVM Heap Memory Usage",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "(jvm_memory_used_bytes{area=\"heap\", job=\"kubernetes-pods\"} / jvm_memory_max_bytes{area=\"heap\", job=\"kubernetes-pods\"}) * 100",
+                "legendFormat": "{{app}} - {{instance}}"
+              }
+            ],
+            "yaxes": [
+              {"format": "percent", "label": "Usage %"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "title": "HTTP Requests Rate",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(rate(http_server_requests_seconds_count{job=\"kubernetes-pods\"}[5m])) by (app)",
+                "legendFormat": "{{app}}"
+              }
+            ],
+            "yaxes": [
+              {"format": "reqps", "label": "Requests/sec"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "title": "HTTP Response Time (P95)",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{job=\"kubernetes-pods\"}[5m])) by (app, le))",
+                "legendFormat": "{{app}} P95"
+              }
+            ],
+            "yaxes": [
+              {"format": "s", "label": "Response Time"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "title": "HikariCP Active Connections",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "targets": [
+              {
+                "expr": "hikaricp_connections_active{job=\"kubernetes-pods\"}",
+                "legendFormat": "{{app}} - {{pool}}"
+              }
+            ],
+            "yaxes": [
+              {"format": "short", "label": "Connections"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "title": "GC Time",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+            "targets": [
+              {
+                "expr": "rate(jvm_gc_pause_seconds_sum{job=\"kubernetes-pods\"}[5m])",
+                "legendFormat": "{{app}} - {{action}}"
+              }
+            ],
+            "yaxes": [
+              {"format": "s", "label": "GC Time"},
+              {"format": "short"}
+            ]
+          },
+          {
+            "title": "Tomcat Active Sessions",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+            "targets": [
+              {
+                "expr": "tomcat_sessions_active_current_sessions{job=\"kubernetes-pods\"}",
+                "legendFormat": "{{app}}"
+              }
+            ],
+            "yaxes": [
+              {"format": "short", "label": "Sessions"},
+              {"format": "short"}
+            ]
+          }
+        ],
+        "templating": {
+          "list": [
+            {
+              "name": "app",
+              "type": "query",
+              "datasource": "Prometheus",
+              "query": "label_values(jvm_memory_used_bytes{job=\"kubernetes-pods\"}, app)",
+              "multi": true,
+              "includeAll": true,
+              "refresh": 1
+            }
+          ]
+        }
+      }
+    }
