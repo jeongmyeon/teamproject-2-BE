@@ -25,6 +25,23 @@ K3s 클러스터를 위한 Prometheus + Grafana 모니터링 시스템
 - **기본 계정**: admin / admin1234
 - **접속**: http://node-ip:30300
 
+### Node Exporter
+- **버전**: v1.11.1
+- **배포 방식**: Linux 노드마다 1개 DaemonSet Pod
+- **수집 메트릭**: CPU, 메모리, Swap, 파일시스템, 디스크 I/O, 네트워크
+- **Prometheus job**: `node-exporter`
+
+### Kubelet cAdvisor
+- **별도 Pod 설치 없음**: 각 노드의 kubelet이 `/metrics/cadvisor`로 제공
+- **수집 메트릭**: Pod/Container CPU, 메모리, 네트워크, 파일시스템 사용량
+- **Prometheus job**: `kubernetes-cadvisor`
+
+### kube-state-metrics
+- **버전**: v2.18.0 (Kubernetes/client-go 1.34 기준)
+- **Replicas**: 1개
+- **수집 메트릭**: Node, Pod, Deployment, StatefulSet, PVC 등 Kubernetes 오브젝트 상태
+- **Prometheus job**: `kube-state-metrics`
+
 ### Alert Rules (자동 설정) ⭐
 1. **PodDown** - 서비스 다운 2분 이상
 2. **HighMemoryUsage** - 메모리 90% 이상 5분
@@ -124,10 +141,16 @@ chmod +x deploy.sh
 cd ~/beadv6_6_frontal_BE/k8s/monitoring
 
 kubectl apply -f namespace.yaml
+kubectl apply -f node-exporter.yaml
+kubectl apply -f kube-state-metrics.yaml
 kubectl apply -f prometheus.yaml
 kubectl apply -f grafana.yaml
 
+# 기존 Prometheus가 실행 중이면 변경된 scrape 설정 다시 로드
+kubectl rollout restart deployment/prometheus -n biddy-monitoring
+
 kubectl get all -n biddy-monitoring
+kubectl get daemonset node-exporter -n biddy-monitoring
 ```
 
 ## 🔍 배포 후 상태 확인
@@ -142,6 +165,8 @@ kubectl get pods -n biddy-monitoring -w
 # 로그 확인
 kubectl logs -n biddy-monitoring -l app=prometheus -f
 kubectl logs -n biddy-monitoring -l app=grafana -f
+kubectl logs -n biddy-monitoring -l app=node-exporter --tail=100
+kubectl logs -n biddy-monitoring -l app=kube-state-metrics --tail=100
 
 # PVC 상태 확인
 kubectl get pvc -n biddy-monitoring
