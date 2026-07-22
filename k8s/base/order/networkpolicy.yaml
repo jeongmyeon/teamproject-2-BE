@@ -1,4 +1,5 @@
 # order는 apigateway뿐 아니라 payment(결제 정보 확인 시 직접 호출)도 허용
+# Prometheus 메트릭 수집을 위해 biddy-monitoring 네임스페이스 허용
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -17,6 +18,13 @@ spec:
         - podSelector:
             matchLabels:
               app: payment
+      ports:
+        - protocol: TCP
+          port: 8083
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: biddy-monitoring
       ports:
         - protocol: TCP
           port: 8083

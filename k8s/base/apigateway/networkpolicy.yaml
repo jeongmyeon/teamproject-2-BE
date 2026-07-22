@@ -1,4 +1,5 @@
 # apigateway는 Traefik이 실행되는 kube-system 네임스페이스에서만 외부 요청을 받는다.
+# Prometheus 메트릭 수집을 위해 biddy-monitoring 네임스페이스 허용
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -14,6 +15,13 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: TCP
+          port: 8000
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: biddy-monitoring
       ports:
         - protocol: TCP
           port: 8000

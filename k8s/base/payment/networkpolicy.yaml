@@ -1,4 +1,5 @@
 # payment는 다른 서비스가 직접 호출하지 않으므로 apigateway에서만 접근 허용
+# Prometheus 메트릭 수집을 위해 biddy-monitoring 네임스페이스 허용
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -14,6 +15,13 @@ spec:
         - podSelector:
             matchLabels:
               app: apigateway
+      ports:
+        - protocol: TCP
+          port: 8085
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: biddy-monitoring
       ports:
         - protocol: TCP
           port: 8085
