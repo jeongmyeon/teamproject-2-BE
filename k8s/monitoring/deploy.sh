@@ -48,9 +48,19 @@ echo "🚨 Deploying Alert Rules..."
 kubectl apply -f alerting-rules.yaml
 echo ""
 
-# 3. Deploy Prometheus
+# 3. Deploy exporters
+echo "🖥️  Deploying Node Exporter..."
+kubectl apply -f node-exporter.yaml
+echo ""
+
+echo "☸️  Deploying kube-state-metrics..."
+kubectl apply -f kube-state-metrics.yaml
+echo ""
+
+# 4. Deploy Prometheus
 echo "📊 Deploying Prometheus..."
 kubectl apply -f prometheus.yaml
+kubectl rollout restart deployment/prometheus -n biddy-monitoring
 echo ""
 
 # Wait for Prometheus to start creating resources
@@ -61,7 +71,7 @@ echo "🔍 Checking Prometheus PVC status..."
 kubectl get pvc -n biddy-monitoring prometheus-pvc
 echo ""
 
-# 4. Deploy Grafana
+# 5. Deploy Grafana
 echo "📈 Deploying Grafana..."
 kubectl apply -f grafana.yaml
 echo ""

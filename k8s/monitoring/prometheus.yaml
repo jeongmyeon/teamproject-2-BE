@@ -39,6 +39,47 @@ data:
         - action: labelmap
           regex: __meta_kubernetes_node_label_(.+)
 
+      # Kubelet cAdvisor (Pod/container CPU, memory, network, filesystem)
+      - job_name: 'kubernetes-cadvisor'
+        kubernetes_sd_configs:
+        - role: node
+        scheme: https
+        metrics_path: /metrics/cadvisor
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+        - action: labelmap
+          regex: __meta_kubernetes_node_label_(.+)
+        - source_labels: [__meta_kubernetes_node_name]
+          target_label: kubernetes_node
+
+      # Node Exporter (host CPU, memory, disk, network)
+      - job_name: 'node-exporter'
+        kubernetes_sd_configs:
+        - role: pod
+          namespaces:
+            names:
+              - biddy-monitoring
+        relabel_configs:
+        - source_labels: [__meta_kubernetes_pod_label_app]
+          action: keep
+          regex: node-exporter
+        - source_labels: [__meta_kubernetes_pod_container_port_name]
+          action: keep
+          regex: metrics
+        - source_labels: [__meta_kubernetes_pod_phase]
+          action: keep
+          regex: Running
+        - source_labels: [__meta_kubernetes_pod_node_name]
+          target_label: kubernetes_node
+
+      # Kubernetes object state (Deployment, Pod, Node, PVC, etc.)
+      - job_name: 'kube-state-metrics'
+        static_configs:
+        - targets:
+          - kube-state-metrics.biddy-monitoring.svc.cluster.local:8080
+
       # Kubernetes Pods
       - job_name: 'kubernetes-pods'
         kubernetes_sd_configs:
