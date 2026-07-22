@@ -1,4 +1,5 @@
 # product는 apigateway, order(장바구니 상품 상세 조회), search(벡터 후보 조회)를 허용
+# Prometheus 메트릭 수집을 위해 biddy-monitoring 네임스페이스 허용
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -20,6 +21,13 @@ spec:
         - podSelector:
             matchLabels:
               app: search
+      ports:
+        - protocol: TCP
+          port: 8082
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: biddy-monitoring
       ports:
         - protocol: TCP
           port: 8082
