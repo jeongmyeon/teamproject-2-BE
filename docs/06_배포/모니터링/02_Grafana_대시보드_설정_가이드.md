@@ -303,6 +303,147 @@ Import 시 **Change uid** → 새로운 고유 ID 입력
 
 ---
 
+## 🎨 커스텀 대시보드 생성 (고급)
+
+### 변수 설정 수정
+
+일부 대시보드는 변수 설정이 맞지 않을 수 있습니다.
+
+#### instance 변수 수정
+
+1. 대시보드 **Settings (⚙️)** → **Variables** → instance 클릭
+2. 설정 수정:
+   ```
+   Query type: Label values
+   Label: instance
+   Metric: jvm_memory_used_bytes
+   Regex: 비워두기
+   Multi-value: ✓
+   Include All option: ✓
+   ```
+
+#### application 변수 수정
+
+```
+Query type: Label values
+Label: app
+Metric: jvm_memory_used_bytes
+Multi-value: ✓
+Include All option: ✓
+```
+
+### 유용한 PromQL 쿼리
+
+직접 패널을 만들 때 사용할 수 있는 쿼리 모음입니다.
+
+#### JVM Heap 메모리 사용률 (%)
+```promql
+(jvm_memory_used_bytes{area="heap", job="kubernetes-pods"} / jvm_memory_max_bytes{area="heap", job="kubernetes-pods"}) * 100
+```
+
+**Panel 설정**:
+- Visualization: Time series
+- Legend: `{{app}} - {{instance}}`
+- Unit: Percent (0-100)
+- Thresholds: 80% (Warning), 90% (Critical)
+
+#### HTTP 초당 요청 수
+```promql
+sum(rate(http_server_requests_seconds_count{job="kubernetes-pods"}[5m])) by (app)
+```
+
+**Panel 설정**:
+- Visualization: Time series
+- Legend: `{{app}}`
+- Unit: Requests/sec
+
+#### HTTP 응답 시간 (P95)
+```promql
+histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{job="kubernetes-pods"}[5m])) by (app, le))
+```
+
+**Panel 설정**:
+- Visualization: Time series
+- Legend: `{{app}} P95`
+- Unit: Seconds
+- Thresholds: 1s (Warning), 3s (Critical)
+
+#### HTTP 응답 시간 (P99)
+```promql
+histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{job="kubernetes-pods"}[5m])) by (app, le))
+```
+
+#### HTTP 에러율 (5xx)
+```promql
+sum(rate(http_server_requests_seconds_count{status=~"5..", job="kubernetes-pods"}[5m])) by (app) / sum(rate(http_server_requests_seconds_count{job="kubernetes-pods"}[5m])) by (app) * 100
+```
+
+**Panel 설정**:
+- Unit: Percent (0-100)
+- Thresholds: 1% (Warning), 5% (Critical)
+
+#### HikariCP 커넥션 풀 사용량
+```promql
+hikaricp_connections_active{job="kubernetes-pods"}
+```
+
+**Panel 설정**:
+- Legend: `{{app}} - {{pool}}`
+
+#### HikariCP 최대 커넥션 대비 사용률
+```promql
+(hikaricp_connections_active{job="kubernetes-pods"} / hikaricp_connections_max{job="kubernetes-pods"}) * 100
+```
+
+#### GC 시간
+```promql
+rate(jvm_gc_pause_seconds_sum{job="kubernetes-pods"}[5m])
+```
+
+**Panel 설정**:
+- Legend: `{{app}} - {{action}} - {{cause}}`
+- Unit: Seconds
+
+#### GC 빈도 (초당 횟수)
+```promql
+rate(jvm_gc_pause_seconds_count{job="kubernetes-pods"}[5m])
+```
+
+#### Tomcat 활성 세션
+```promql
+tomcat_sessions_active_current_sessions{job="kubernetes-pods"}
+```
+
+#### 스레드 수
+```promql
+jvm_threads_live_threads{job="kubernetes-pods"}
+```
+
+#### CPU 사용률 (프로세스)
+```promql
+process_cpu_usage{job="kubernetes-pods"} * 100
+```
+
+**Panel 설정**:
+- Unit: Percent (0-100)
+
+#### 로그백 에러 로그 수
+```promql
+rate(logback_events_total{level="error", job="kubernetes-pods"}[5m])
+```
+
+### JSON Import 방식
+
+커스텀 대시보드를 JSON 파일로 저장하고 공유할 수 있습니다.
+
+1. **Grafana → Dashboards → Import**
+2. **Upload JSON file**
+3. JSON 파일 선택
+4. **Prometheus 데이터소스 선택**
+5. **Import**
+
+---
+
 ## 📊 추가 추천 대시보드 (선택)
 
 필요에 따라 추가로 Import:
@@ -359,11 +500,53 @@ Import 시 **Change uid** → 새로운 고유 ID 입력
 
 ---
 
+## 🏗️ 대시보드 설계 Best Practices
+
+### 1. 계층적 구성
+
+```
+1. Overview 대시보드
+   - 전체 시스템 상태 한눈에
+   - 핵심 지표만 표시
+
+2. 서비스별 상세 대시보드
+   - Member, Product, Order 등
+   - 개별 서비스 깊이 있는 분석
+
+3. 인프라 대시보드
+   - 노드, 네트워크, 스토리지
+   - 리소스 추세 분석
+```
+
+### 2. 패널 구성 원칙
+
+- **상단**: 핵심 지표 (RED - Rate, Errors, Duration)
+- **중단**: 리소스 사용량 (CPU, 메모리)
+- **하단**: 상세 메트릭 (GC, Thread, Connection Pool)
+
+### 3. Alert 통합
+
+주요 메트릭에 Alert 설정:
+- CPU > 80%
+- 메모리 > 90%
+- HTTP 5xx 에러율 > 1%
+- 응답 시간 P95 > 1s
+
+### 4. 변수 활용 권장사항
+
+모든 대시보드에 기본 변수 추가:
+- `$app`: 애플리케이션 선택
+- `$instance`: 인스턴스 선택
+- `$interval`: 시간 범위 자동 조정
+
+---
+
 ## 🔗 관련 링크
 
 - [Grafana 대시보드 갤러리](https://grafana.com/grafana/dashboards/)
 - [Prometheus 쿼리 가이드](https://prometheus.io/docs/prometheus/latest/querying/basics/)
 - [PromQL 치트시트](https://promlabs.com/promql-cheat-sheet/)
+- [Spring Boot Actuator 메트릭](https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html#actuator.metrics)
 
 ---
 
