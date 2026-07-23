@@ -259,7 +259,10 @@ kubectl get configmap -n biddy biddy-common-config
 
 ### 3. Secret 생성
 
+**⚠️ 보안 경고: 아래 예제 값들은 개발/테스트용입니다. 프로덕션에서는 반드시 강력한 값으로 변경하세요!**
+
 ```bash
+# 개발/테스트 환경용 (예제)
 kubectl create secret generic biddy-secret \
   --namespace=biddy \
   --from-literal=POSTGRES_PASSWORD=biddy1234 \
@@ -275,7 +278,27 @@ kubectl create secret generic biddy-secret \
 kubectl get secret -n biddy biddy-secret
 ```
 
-**중요:** `GEMINI_API_KEY`와 `OPENAI_API_KEY`는 실제 값으로 교체하세요.
+**프로덕션 환경 보안 체크리스트:**
+- [ ] `POSTGRES_PASSWORD`: 16자 이상의 강력한 비밀번호로 변경
+- [ ] `JWT_SECRET`: 최소 32자 이상의 랜덤 문자열로 변경 (예: `openssl rand -base64 32`)
+- [ ] `MAIL_PASSWORD`: 실제 이메일 앱 비밀번호 사용
+- [ ] `TOSS_SECRET_KEY`: Toss Payments에서 발급받은 실제 키 사용
+- [ ] `TOSS_PAYMENTS_SECRET_KEY`: Toss Payments에서 발급받은 실제 시크릿 키 사용
+- [ ] `GEMINI_API_KEY`: Google AI Studio에서 발급받은 실제 키
+- [ ] `OPENAI_API_KEY`: OpenAI에서 발급받은 실제 키
+
+**랜덤 비밀번호 생성 예제:**
+```bash
+# PostgreSQL 비밀번호 (20자)
+POSTGRES_PASSWORD=$(openssl rand -base64 20)
+
+# JWT Secret (32자)
+JWT_SECRET=$(openssl rand -base64 32)
+
+echo "생성된 비밀번호를 안전한 곳에 저장하세요!"
+echo "POSTGRES_PASSWORD: $POSTGRES_PASSWORD"
+echo "JWT_SECRET: $JWT_SECRET"
+```
 
 ### 4. GHCR (GitHub Container Registry) Secret 생성
 

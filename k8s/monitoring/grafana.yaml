@@ -123,4 +123,7 @@ metadata:
   namespace: biddy-monitoring
 type: Opaque
 stringData:
-  admin-password: "admin1234"  # 프로덕션에서는 변경 필수
+  # 보안 강화: 환경 변수 GRAFANA_ADMIN_PASSWORD 사용 권장
+  # 배포 전 반드시 변경: kubectl create secret generic grafana-secrets \
+  #   --from-literal=admin-password="YOUR_STRONG_PASSWORD" -n biddy-monitoring
+  admin-password: "${GRAFANA_ADMIN_PASSWORD:-admin1234}"  # 기본값은 개발용, 프로덕션에서는 반드시 변경
