@@ -37,4 +37,11 @@ resources:
   - chat/service.yaml
   - chatbot/deployment.yaml
   - chatbot/service.yaml
+  - common-hpas.yaml
   - ingress.yaml
+
+patches:
+  - path: common-resources-patch.yaml
+    target:
+      kind: Deployment
+      name: order
