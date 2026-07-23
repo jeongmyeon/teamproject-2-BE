@@ -197,7 +197,18 @@ kubectl get pvc -n biddy-monitoring
 
 **로그인 정보**:
 - Username: `admin`
-- Password: `admin1234` (프로덕션에서는 변경 필수!)
+- Password: `${GRAFANA_ADMIN_PASSWORD:-admin1234}` (기본값은 개발용)
+
+**⚠️ 프로덕션 배포 시 비밀번호 변경 필수!**
+```bash
+# Grafana 비밀번호 변경 방법
+kubectl create secret generic grafana-secrets \
+  --from-literal=admin-password='YOUR_STRONG_PASSWORD' \
+  -n biddy-monitoring --dry-run=client -o yaml | kubectl apply -f -
+
+# Grafana Pod 재시작으로 변경사항 적용
+kubectl rollout restart deployment/grafana -n biddy-monitoring
+```
 
 ### Prometheus 접속
 
