@@ -36,6 +36,8 @@ payment:
   idempotency:
     ttl-minutes: ${PAYMENT_IDEMPOTENCY_TTL_MINUTES:30}
     order-lock-ttl-minutes: ${PAYMENT_ORDER_LOCK_TTL_MINUTES:5}
+  settlement:
+    batch-size: ${PAYMENT_SETTLEMENT_BATCH_SIZE:500}
 
 eureka:
   client:

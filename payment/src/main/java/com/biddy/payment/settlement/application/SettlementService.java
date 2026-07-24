@@ -29,15 +29,18 @@ public class SettlementService {
     private final SettlementRepository settlementRepository;
     private final SettlementItemRepository settlementItemRepository;
     private final DepositService depositService;
+    private final SettlementBatchExecutor settlementBatchExecutor;
 
     public SettlementService(
             SettlementRepository settlementRepository,
             SettlementItemRepository settlementItemRepository,
-            DepositService depositService
+            DepositService depositService,
+            SettlementBatchExecutor settlementBatchExecutor
     ) {
         this.settlementRepository = settlementRepository;
         this.settlementItemRepository = settlementItemRepository;
         this.depositService = depositService;
+        this.settlementBatchExecutor = settlementBatchExecutor;
     }
 
     @Transactional
@@ -116,6 +119,18 @@ public class SettlementService {
                 settlement.getSettlementAmount(),
                 String.valueOf(settlement.getId())
         );
+    }
+
+    public int completePendingSettlements(int batchSize) {
+        int processedCount = 0;
+
+        while (true) {
+            int chunkCount = settlementBatchExecutor.completePendingSettlementChunk(batchSize);
+            if (chunkCount == 0) {
+                return processedCount;
+            }
+            processedCount += chunkCount;
+        }
     }
 
     private SettlementResponse createSellerSettlement(

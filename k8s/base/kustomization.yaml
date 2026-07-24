@@ -33,6 +33,7 @@ resources:
   - auction/networkpolicy.yaml
   - payment/deployment.yaml
   - payment/service.yaml
+  - payment/settlement-cronjob.yaml
   - chat/deployment.yaml
   - chat/service.yaml
   - chatbot/deployment.yaml

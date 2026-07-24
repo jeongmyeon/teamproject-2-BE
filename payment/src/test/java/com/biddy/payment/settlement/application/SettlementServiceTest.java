@@ -77,4 +77,39 @@ class SettlementServiceTest {
         DepositBalanceResponse balance = depositService.getBalance(sellerId);
         assertThat(balance.balance()).isEqualTo(76_000L);
     }
+
+    @Test
+    void completePendingSettlements_completesPendingSettlementsInBatch() {
+        Long sellerId = 32L;
+
+        settlementService.createPendingSettlement(new PaymentCompletedEvent(
+                UUID.randomUUID(),
+                3L,
+                302L,
+                12L,
+                sellerId,
+                100_000L,
+                PaymentMethod.WALLET,
+                LocalDateTime.now()
+        ));
+        settlementService.createPendingSettlement(new PaymentCompletedEvent(
+                UUID.randomUUID(),
+                4L,
+                303L,
+                13L,
+                sellerId,
+                40_000L,
+                PaymentMethod.NORMAL,
+                LocalDateTime.now()
+        ));
+
+        int processedCount = settlementService.completePendingSettlements(1);
+
+        assertThat(processedCount).isGreaterThanOrEqualTo(2);
+        assertThat(settlementRepository.findByOrderId(302L).orElseThrow().getStatus()).isEqualTo(SettlementStatus.COMPLETED);
+        assertThat(settlementRepository.findByOrderId(303L).orElseThrow().getStatus()).isEqualTo(SettlementStatus.COMPLETED);
+
+        DepositBalanceResponse balance = depositService.getBalance(sellerId);
+        assertThat(balance.balance()).isEqualTo(133_000L);
+    }
 }

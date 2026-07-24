@@ -65,7 +65,8 @@ public class JwtAuthenticationGlobalFilter implements GlobalFilter, Ordered {
     private static final List<AdminOnlyRule> ADMIN_ONLY_RULES = List.of(
             new AdminOnlyRule(null, "/api/admin/"),
             new AdminOnlyRule(HttpMethod.PATCH, "/api/payments/deposits/adjust"),
-            new AdminOnlyRule(HttpMethod.POST, "/api/payments/settlements/monthly")
+            new AdminOnlyRule(HttpMethod.POST, "/api/payments/settlements/monthly"),
+            new AdminOnlyRule(HttpMethod.POST, "/api/payments/settlements/pending-batch")
     );
 
     private record AdminOnlyRule(HttpMethod method, String pathPrefix) {

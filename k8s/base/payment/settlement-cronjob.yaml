@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: payment-settlement-batch
+  namespace: biddy
+spec:
+  schedule: "10 2 * * *"
+  timeZone: Asia/Seoul
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: settlement-batch
+              image: curlimages/curl:8.8.0
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: PAYMENT_SETTLEMENT_BATCH_SIZE
+                  value: "500"
+              command:
+                - sh
+                - -c
+                - >
+                  curl --fail --show-error --silent
+                  -X POST
+                  "http://payment:8085/api/payments/settlements/pending-batch?batchSize=${PAYMENT_SETTLEMENT_BATCH_SIZE}"
