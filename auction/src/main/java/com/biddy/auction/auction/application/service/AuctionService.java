@@ -71,7 +71,7 @@ public class AuctionService implements AuctionUseCase {
     /**
      * 경매 상세 정보를 조회한다.
      *
-     * <p>경매 엔티티와 최고 입찰 정보를 조합하여 반환한다.
+     * <p>경매 엔티티에 저장된 현재가와 현재 최고 입찰자를 반환한다.
      * 경매가 존재하지 않으면 {@code AUCTION_NOT_FOUND} 예외를 발생시킨다.</p>
      *
      * @param auctionId 경매 ID
@@ -84,9 +84,6 @@ public class AuctionService implements AuctionUseCase {
         Auction auction = auctionRepository.findById(auctionId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.AUCTION_NOT_FOUND));
 
-        Bid topBid = bidRepository.findTopByAuctionId(auctionId)
-                .orElse(null);
-
         boolean isWatching = memberId != null && watchRedis.isWatching(memberId, auctionId);
         int watcherCount = watchRedis.getCount(auctionId);
 
@@ -95,7 +92,7 @@ public class AuctionService implements AuctionUseCase {
                         .map(Bid::getAmount).orElse(null)
                 : null;
 
-        return AuctionDetailResult.from(auction, topBid, isWatching, watcherCount, myHighestBid);
+        return AuctionDetailResult.from(auction, isWatching, watcherCount, myHighestBid);
     }
 
     /**

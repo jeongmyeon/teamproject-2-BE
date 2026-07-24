@@ -34,6 +34,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class AuctionServiceTest {
@@ -58,6 +60,7 @@ class AuctionServiceTest {
                 .startPrice(100000L)
                 .minIncrement(10000L)
                 .currentBid(currentBid)
+                .currentBidderId(bidCount > 0 ? 42L : null)
                 .bidCount(bidCount)
                 .watcherCount(10)
                 .endsAt(LocalDateTime.of(2026, 6, 20, 15, 0))
@@ -191,9 +194,7 @@ class AuctionServiceTest {
         @DisplayName("존재하는 경매를 상세 조회하면 정상 결과를 반환한다")
         void withExistingAuction_returnsDetail() {
             Auction auction = createAuction("A-001", "나이키 덩크", 720000L, 6);
-            Bid topBid = createBid("A-001", 42L, 720000L);
             given(auctionRepository.findById("A-001")).willReturn(Optional.of(auction));
-            given(bidRepository.findTopByAuctionId("A-001")).willReturn(Optional.of(topBid));
             given(watchRedis.getCount("A-001")).willReturn(10);
 
             AuctionDetailResult result = auctionService.getAuctionDetail("A-001", null);
@@ -207,6 +208,8 @@ class AuctionServiceTest {
             assertThat(result.watcherCount()).isEqualTo(10);
             assertThat(result.topBidder()).isNotNull();
             assertThat(result.topBidder().bidderId()).isEqualTo(42L);
+            assertThat(result.topBidder().amount()).isEqualTo(720000L);
+            verify(bidRepository, never()).findTopByAuctionId("A-001");
         }
 
         @Test
@@ -214,13 +217,13 @@ class AuctionServiceTest {
         void withNoBids_topBidderIsNull() {
             Auction auction = createAuction("A-002", "상품", 0L, 0);
             given(auctionRepository.findById("A-002")).willReturn(Optional.of(auction));
-            given(bidRepository.findTopByAuctionId("A-002")).willReturn(Optional.empty());
 
             AuctionDetailResult result = auctionService.getAuctionDetail("A-002", null);
 
             assertThat(result.topBidder()).isNull();
             assertThat(result.isWatching()).isFalse();
             assertThat(result.myHighestBid()).isNull();
+            verify(bidRepository, never()).findTopByAuctionId("A-002");
         }
 
         @Test

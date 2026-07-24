@@ -2,7 +2,6 @@ package com.biddy.auction.auction.application.dto;
 
 import com.biddy.auction.auction.domain.model.Auction;
 import com.biddy.auction.auction.domain.model.AuctionStatus;
-import com.biddy.auction.bid.domain.model.Bid;
 
 import java.time.LocalDateTime;
 
@@ -35,10 +34,10 @@ public record AuctionDetailResult(
     public record TopBidderInfo(Long bidderId, Long amount) {
     }
 
-    public static AuctionDetailResult from(Auction auction, Bid topBid,
+    public static AuctionDetailResult from(Auction auction,
                                            boolean isWatching, int watcherCount, Long myHighestBid) {
-        TopBidderInfo topBidder = topBid != null
-                ? new TopBidderInfo(topBid.getBidderId(), topBid.getAmount())
+        TopBidderInfo topBidder = auction.getCurrentBidderId() != null
+                ? new TopBidderInfo(auction.getCurrentBidderId(), auction.getCurrentBid())
                 : null;
 
         return new AuctionDetailResult(

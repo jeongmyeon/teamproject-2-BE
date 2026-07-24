@@ -85,7 +85,11 @@ class PlaceBidServiceTest {
             assertThat(result.amount()).isEqualTo(520000L);
             assertThat(result.currentBid()).isEqualTo(520000L);
             assertThat(result.bidCount()).isEqualTo(6);
+            assertThat(liveAuction.getCurrentBid()).isEqualTo(520000L);
+            assertThat(liveAuction.getCurrentBidderId()).isEqualTo(42L);
+            assertThat(liveAuction.getBidCount()).isEqualTo(6);
             verify(bidRepository).save(any(Bid.class));
+            verify(auctionRepository).save(liveAuction);
             verify(webSocketPublisher).publishBid("A-001", 520000L, 6, 42L);
         }
 
