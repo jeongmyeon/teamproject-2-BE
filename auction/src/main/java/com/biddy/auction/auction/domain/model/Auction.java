@@ -54,6 +54,10 @@ public class Auction extends BaseEntity {
     @Column(name = "current_bid", nullable = false)
     private Long currentBid = 0L;
 
+    /** 현재 최고 입찰자 회원 ID (입찰이 없으면 null) */
+    @Column(name = "current_bidder_id")
+    private Long currentBidderId;
+
     // -- 통계 --
 
     @Builder.Default
@@ -98,12 +102,14 @@ public class Auction extends BaseEntity {
 
     /**
      * 입찰을 적용한다.
-     * 현재가와 입찰 수를 갱신한다.
+     * 현재가, 현재 최고 입찰자와 입찰 수를 함께 갱신한다.
      *
      * @param bidAmount 입찰 금액
+     * @param bidderId 입찰자 회원 ID
      */
-    public void applyBid(Long bidAmount) {
+    public void applyBid(Long bidAmount, Long bidderId) {
         this.currentBid = bidAmount;
+        this.currentBidderId = bidderId;
         this.bidCount++;
     }
 

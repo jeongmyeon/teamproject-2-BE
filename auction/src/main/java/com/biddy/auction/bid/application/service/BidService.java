@@ -98,8 +98,9 @@ public class BidService implements BidUseCase {
 
         Bid savedBid = bidRepository.save(bid);
 
-        // 5. 경매 현재가 갱신
-        lockedAuction.applyBid(command.amount());
+        // 5. 경매 현재가, 현재 최고 입찰자와 입찰 수를 함께 갱신
+        lockedAuction.applyBid(command.amount(), command.bidderId());
+        auctionRepository.save(lockedAuction);
 
         // 6. WebSocket으로 경매 구독자에게 실시간 push
         webSocketPublisher.publishBid(
