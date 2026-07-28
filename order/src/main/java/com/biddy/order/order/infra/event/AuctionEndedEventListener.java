@@ -72,8 +72,10 @@ public class AuctionEndedEventListener {
 
         } catch (JsonProcessingException e) {
             log.error("Failed to deserialize AuctionEndedEventPayload", e);
+            throw new RuntimeException("Failed to deserialize AuctionEndedEventPayload", e);
         } catch (Exception e) {
             log.error("Error processing AuctionEndedEvent", e);
+            throw new RuntimeException("Error processing AuctionEndedEvent", e);
         }
     }
 }
