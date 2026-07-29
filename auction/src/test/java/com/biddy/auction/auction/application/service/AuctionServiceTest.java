@@ -26,7 +26,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -85,8 +84,8 @@ class AuctionServiceTest {
         ProductAuctionRegisteredPayload payload = new ProductAuctionRegisteredPayload(
                 10L,
                 20L,
-                new BigDecimal("5000.00"),
-                500,
+                5000L,
+                500L,
                 LocalDateTime.of(2026, 7, 30, 10, 0),
                 LocalDateTime.of(2026, 7, 31, 10, 0)
         );
