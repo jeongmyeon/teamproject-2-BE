@@ -116,7 +116,11 @@ public class AuctionService implements AuctionUseCase {
 
         if (auction.hasBids()) {
             Bid topBid = bidRepository.findTopByAuctionId(auctionId)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.BID_NOT_FOUND));
+                    .orElseThrow(() -> {
+                        log.error("경매 입찰 수와 입찰 데이터 불일치: auctionId={}, bidCount={}",
+                                auctionId, auction.getBidCount());
+                        return new BusinessException(ErrorCode.DATA_INTEGRITY_ERROR);
+                    });
             return AuctionResultInfo.sold(auction, topBid);
         }
 
@@ -135,6 +139,8 @@ public class AuctionService implements AuctionUseCase {
     @Transactional
     public void createFromProduct(ProductAuctionRegisteredPayload payload) {
         String auctionId = generateAuctionId();
+        long startPrice = payload.startPrice().longValueExact();
+        long minIncrement = payload.minIncrement().longValue();
 
         if (auctionRepository.existsById(auctionId)) {
             log.warn("경매 이미 존재: auctionId={}", auctionId);
@@ -145,9 +151,9 @@ public class AuctionService implements AuctionUseCase {
                 .auctionId(auctionId)
                 .productId(payload.productId())
                 .sellerId(payload.sellerId())
-                .startPrice(payload.startPrice())
-                .currentBid(payload.startPrice())
-                .minIncrement(payload.minIncrement())
+                .startPrice(startPrice)
+                .currentBid(startPrice)
+                .minIncrement(minIncrement)
                 .startsAt(payload.startsAt())
                 .endsAt(payload.endsAt())
                 .build();
@@ -173,7 +179,11 @@ public class AuctionService implements AuctionUseCase {
 
         if (auction.hasBids()) {
             Bid topBid = bidRepository.findTopByAuctionId(auctionId)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.BID_NOT_FOUND));
+                    .orElseThrow(() -> {
+                        log.error("경매 입찰 수와 입찰 데이터 불일치: auctionId={}, bidCount={}",
+                                auctionId, auction.getBidCount());
+                        return new BusinessException(ErrorCode.DATA_INTEGRITY_ERROR);
+                    });
             auction.close(topBid.getBidderId(), topBid.getBidId());
             webSocketPublisher.publishEnded(auctionId, topBid.getBidderId(), topBid.getAmount());
             auctionEndedEventProducer.publish(auction, topBid);

@@ -49,9 +49,6 @@ management:
       prometheus:
         enabled: true
 
-jwt:
-  secret: ${JWT_SECRET:biddy-default-jwt-secret-key-for-development-only}
-
 # Transactional Outbox Pattern Configuration
 outbox:
   scheduler:

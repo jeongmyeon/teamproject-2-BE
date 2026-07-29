@@ -14,8 +14,5 @@ ALTER TABLE auction
 
 COMMENT ON COLUMN auction.version IS 'JPA optimistic lock version';
 
-CREATE INDEX IF NOT EXISTS idx_auction_id_version
-    ON auction (auction_id, version);
-
 -- 애플리케이션을 이전 버전으로 롤백해도 version 컬럼은 유지한다.
 -- 비관적 락 구현은 이 추가 컬럼의 영향을 받지 않는다.

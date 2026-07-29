@@ -9,9 +9,14 @@ import com.biddy.auction.auction.presentation.dto.AuctionResultResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -21,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/auctions")
 @RequiredArgsConstructor
+@Validated
 public class AuctionController {
 
     private final AuctionUseCase auctionUseCase;
@@ -29,9 +35,10 @@ public class AuctionController {
     @GetMapping
     public ResponseEntity<Page<AuctionFeedResponse>> getAuctionFeed(
             @Parameter(description = "경매 상태 (LIVE, ENDED)") @RequestParam(required = false) AuctionStatus status,
-            @Parameter(description = "정렬 기준 (ending: 마감임박, price: 높은가격, latest: 최신)") @RequestParam(required = false) String sort,
-            @Parameter(description = "페이지 번호 (0부터)") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "페이지 크기") @RequestParam(defaultValue = "20") int size
+            @Parameter(description = "정렬 기준 (ending: 마감임박, price: 높은가격, priceAsc: 낮은가격, latest: 최신)")
+            @RequestParam(required = false) @Pattern(regexp = "ending|price|priceAsc|latest") String sort,
+            @Parameter(description = "페이지 번호 (0부터)") @RequestParam(defaultValue = "0") @Min(0) int page,
+            @Parameter(description = "페이지 크기") @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
     ) {
         AuctionFeedQuery query = new AuctionFeedQuery(status, sort, page, size);
         Page<AuctionFeedResponse> response = auctionUseCase.getAuctionFeed(query)
@@ -43,7 +50,7 @@ public class AuctionController {
     @GetMapping("/{auctionId}")
     public ResponseEntity<AuctionDetailResponse> getAuctionDetail(
             @Parameter(description = "경매 ID (예: A-FNF97)") @PathVariable String auctionId,
-            @RequestHeader(value = "X-Member-Id", required = false) Long memberId
+            @RequestHeader(value = "X-Member-Id", required = false) @Positive Long memberId
     ) {
         AuctionDetailResponse response = AuctionDetailResponse.from(
                 auctionUseCase.getAuctionDetail(auctionId, memberId));
@@ -54,7 +61,7 @@ public class AuctionController {
     @PostMapping("/{auctionId}/close")
     public ResponseEntity<Void> closeAuction(
             @Parameter(description = "경매 ID") @PathVariable String auctionId,
-            @RequestHeader("X-Member-Id") Long memberId
+            @RequestHeader("X-Member-Id") @Positive Long memberId
     ) {
         auctionUseCase.closeAuctionBySeller(auctionId, memberId);
         return ResponseEntity.ok().build();

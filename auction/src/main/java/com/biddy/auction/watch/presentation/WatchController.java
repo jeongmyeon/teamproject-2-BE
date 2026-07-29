@@ -6,8 +6,10 @@ import com.biddy.auction.watch.presentation.dto.ToggleWatchResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -16,6 +18,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/auctions/{auctionId}/watch")
 @RequiredArgsConstructor
+@Validated
 public class WatchController {
 
     private final WatchUseCase watchUseCase;
@@ -24,7 +27,7 @@ public class WatchController {
     @GetMapping
     public ResponseEntity<Map<String, Boolean>> isWatching(
             @PathVariable String auctionId,
-            @RequestHeader(value = "X-Member-Id", required = false) Long memberId
+            @RequestHeader(value = "X-Member-Id", required = false) @Positive Long memberId
     ) {
         boolean watching = watchUseCase.isWatching(auctionId, memberId);
         return ResponseEntity.ok(Map.of("watching", watching));
@@ -34,7 +37,7 @@ public class WatchController {
     @PostMapping
     public ResponseEntity<ToggleWatchResponse> toggleWatch(
             @Parameter(description = "경매 ID") @PathVariable String auctionId,
-            @RequestHeader("X-Member-Id") Long memberId
+            @RequestHeader("X-Member-Id") @Positive Long memberId
     ) {
         ToggleWatchResult result = watchUseCase.toggleWatch(auctionId, memberId);
         return ResponseEntity.ok(ToggleWatchResponse.from(result));
