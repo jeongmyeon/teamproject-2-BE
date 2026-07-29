@@ -93,6 +93,18 @@ public class Auction extends BaseEntity {
     @Column(name = "winning_bid_id")
     private Long winningBidId;
 
+    // -- 낙관적 락 지원 --
+
+    /**
+     * JPA 낙관적 락 버전 필드
+     * 동시 수정 시 OptimisticLockException 발생
+     * UPDATE 시 자동으로 WHERE version = ? 조건 추가
+     */
+    @Version
+    @Column(name = "version", nullable = false)
+    @Builder.Default
+    private Long version = 0L;
+
     // -- 도메인 메서드 --
 
     /** 경매가 현재 진행 중인지 확인한다. */

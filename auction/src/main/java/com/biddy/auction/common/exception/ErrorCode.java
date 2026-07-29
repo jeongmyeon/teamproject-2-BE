@@ -33,6 +33,7 @@ public enum ErrorCode {
     // 409 Conflict
     AUCTION_ALREADY_ENDED(HttpStatus.CONFLICT, "A002", "이미 종료된 경매입니다"),
     AUCTION_STILL_LIVE(HttpStatus.CONFLICT, "A003", "아직 진행 중인 경매입니다"),
+    BID_CONCURRENT_MODIFICATION(HttpStatus.CONFLICT, "B004", "동시 입찰 충돌이 발생했습니다. 최신 가격을 확인한 후 다시 시도해주세요"),
 
     // 500 Internal Server Error
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "S001", "서버 내부 오류가 발생했습니다");

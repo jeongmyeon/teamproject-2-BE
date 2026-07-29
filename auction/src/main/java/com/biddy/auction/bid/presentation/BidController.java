@@ -27,7 +27,7 @@ public class BidController {
 
     private final BidUseCase bidUseCase;
 
-    @Operation(summary = "입찰 실행", description = "경매에 입찰한다. 1차 검증 -> 비관적 락 -> 최종 검증 -> 입찰 저장 -> 현재가 갱신. 성공 시 WebSocket으로 구독자에게 push.")
+    @Operation(summary = "입찰 실행", description = "낙관적 락으로 입찰을 커밋한다. 201 응답은 입찰 저장과 경매 현재가 갱신이 모두 완료된 경우에만 반환한다.")
     @PostMapping
     public ResponseEntity<PlaceBidResponse> placeBid(
             @Parameter(description = "경매 ID") @PathVariable String auctionId,
