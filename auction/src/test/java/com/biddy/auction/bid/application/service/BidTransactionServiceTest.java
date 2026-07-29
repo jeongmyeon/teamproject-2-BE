@@ -101,6 +101,72 @@ class BidTransactionServiceTest {
     }
 
     @Test
+    @DisplayName("입찰 금액이 null이면 INVALID_BID_AMOUNT")
+    void executeBidTransaction_nullAmount_throwsInvalidBidAmount() {
+        PlaceBidCommand command = new PlaceBidCommand("A-001", 42L, null);
+
+        assertThatThrownBy(() -> transactionService.executeBidTransaction(command))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_BID_AMOUNT);
+
+        verify(auctionRepository, never()).findById(any());
+        verify(bidRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("시작 전 경매에는 입찰할 수 없다")
+    void executeBidTransaction_beforeStart_throwsAuctionNotStarted() {
+        Auction scheduledAuction = Auction.builder()
+                .auctionId("A-001")
+                .sellerId(10L)
+                .productId(1L)
+                .startPrice(100000L)
+                .currentBid(500000L)
+                .minIncrement(10000L)
+                .bidCount(5)
+                .status(AuctionStatus.LIVE)
+                .startsAt(LocalDateTime.now().plusHours(1))
+                .endsAt(LocalDateTime.now().plusHours(2))
+                .build();
+        given(auctionRepository.findById("A-001")).willReturn(Optional.of(scheduledAuction));
+
+        assertThatThrownBy(() -> transactionService.executeBidTransaction(
+                new PlaceBidCommand("A-001", 42L, 520000L)))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.AUCTION_NOT_STARTED);
+
+        verify(bidRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("종료 시각이 지난 경매에는 상태가 LIVE여도 입찰할 수 없다")
+    void executeBidTransaction_afterEndTime_throwsAuctionAlreadyEnded() {
+        Auction expiredAuction = Auction.builder()
+                .auctionId("A-001")
+                .sellerId(10L)
+                .productId(1L)
+                .startPrice(100000L)
+                .currentBid(500000L)
+                .minIncrement(10000L)
+                .bidCount(5)
+                .status(AuctionStatus.LIVE)
+                .startsAt(LocalDateTime.now().minusHours(2))
+                .endsAt(LocalDateTime.now().minusHours(1))
+                .build();
+        given(auctionRepository.findById("A-001")).willReturn(Optional.of(expiredAuction));
+
+        assertThatThrownBy(() -> transactionService.executeBidTransaction(
+                new PlaceBidCommand("A-001", 42L, 520000L)))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.AUCTION_ALREADY_ENDED);
+
+        verify(bidRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("flush에서 발생한 버전 충돌을 오케스트레이터로 전파한다")
     void executeBidTransaction_flushConflict_propagates() {
         PlaceBidCommand command = new PlaceBidCommand("A-001", 42L, 520000L);

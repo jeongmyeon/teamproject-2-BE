@@ -116,7 +116,11 @@ public class AuctionService implements AuctionUseCase {
 
         if (auction.hasBids()) {
             Bid topBid = bidRepository.findTopByAuctionId(auctionId)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.BID_NOT_FOUND));
+                    .orElseThrow(() -> {
+                        log.error("경매 입찰 수와 입찰 데이터 불일치: auctionId={}, bidCount={}",
+                                auctionId, auction.getBidCount());
+                        return new BusinessException(ErrorCode.DATA_INTEGRITY_ERROR);
+                    });
             return AuctionResultInfo.sold(auction, topBid);
         }
 
@@ -173,7 +177,11 @@ public class AuctionService implements AuctionUseCase {
 
         if (auction.hasBids()) {
             Bid topBid = bidRepository.findTopByAuctionId(auctionId)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.BID_NOT_FOUND));
+                    .orElseThrow(() -> {
+                        log.error("경매 입찰 수와 입찰 데이터 불일치: auctionId={}, bidCount={}",
+                                auctionId, auction.getBidCount());
+                        return new BusinessException(ErrorCode.DATA_INTEGRITY_ERROR);
+                    });
             auction.close(topBid.getBidderId(), topBid.getBidId());
             webSocketPublisher.publishEnded(auctionId, topBid.getBidderId(), topBid.getAmount());
             auctionEndedEventProducer.publish(auction, topBid);

@@ -7,6 +7,7 @@ import com.biddy.auction.auction.application.dto.AuctionResultInfo;
 import com.biddy.auction.auction.domain.model.Auction;
 import com.biddy.auction.auction.domain.model.AuctionStatus;
 import com.biddy.auction.auction.domain.repository.AuctionRepository;
+import com.biddy.auction.auction.infra.kafka.ProductAuctionRegisteredPayload;
 import com.biddy.auction.bid.domain.model.Bid;
 import com.biddy.auction.bid.domain.repository.BidRepository;
 import com.biddy.auction.common.exception.BusinessException;
@@ -75,6 +76,30 @@ class AuctionServiceTest {
                 .amount(amount)
                 .bidAt(LocalDateTime.of(2026, 6, 18, 14, 0))
                 .build();
+    }
+
+    @Test
+    @DisplayName("상품 경매 등록 이벤트의 가격 타입을 변환하여 경매를 생성한다")
+    void createFromProduct_convertsPriceContractAndSavesAuction() {
+        ProductAuctionRegisteredPayload payload = new ProductAuctionRegisteredPayload(
+                10L,
+                20L,
+                5000L,
+                500L,
+                LocalDateTime.of(2026, 7, 30, 10, 0),
+                LocalDateTime.of(2026, 7, 31, 10, 0)
+        );
+        ArgumentCaptor<Auction> captor = ArgumentCaptor.forClass(Auction.class);
+
+        auctionService.createFromProduct(payload);
+
+        verify(auctionRepository).save(captor.capture());
+        Auction savedAuction = captor.getValue();
+        assertThat(savedAuction.getProductId()).isEqualTo(10L);
+        assertThat(savedAuction.getSellerId()).isEqualTo(20L);
+        assertThat(savedAuction.getStartPrice()).isEqualTo(5000L);
+        assertThat(savedAuction.getCurrentBid()).isEqualTo(5000L);
+        assertThat(savedAuction.getMinIncrement()).isEqualTo(500L);
     }
 
     @Nested
@@ -267,6 +292,19 @@ class AuctionServiceTest {
             assertThat(result.finalBid()).isEqualTo(720000L);
             assertThat(result.totalBids()).isEqualTo(5);
             assertThat(result.paymentDeadline()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("입찰 수가 있지만 입찰 행이 없으면 DATA_INTEGRITY_ERROR")
+        void soldAuction_withoutBidRow_throwsDataIntegrityError() {
+            Auction auction = createEndedAuction("A-001", 5);
+            given(auctionRepository.findById("A-001")).willReturn(Optional.of(auction));
+            given(bidRepository.findTopByAuctionId("A-001")).willReturn(Optional.empty());
+
+            assertThatThrownBy(() -> auctionService.getAuctionResult("A-001"))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.DATA_INTEGRITY_ERROR);
         }
 
         @Test

@@ -15,6 +15,8 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 /**
  * 한 번의 입찰 시도를 독립 트랜잭션으로 처리한다.
  *
@@ -38,6 +40,8 @@ public class BidTransactionService {
             isolation = Isolation.READ_COMMITTED
     )
     public PlaceBidResult executeBidTransaction(PlaceBidCommand command) {
+        validateCommand(command);
+
         Auction auction = auctionRepository.findById(command.auctionId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.AUCTION_NOT_FOUND));
 
@@ -67,8 +71,32 @@ public class BidTransactionService {
         );
     }
 
+    private void validateCommand(PlaceBidCommand command) {
+        if (command == null
+                || command.auctionId() == null
+                || command.auctionId().isBlank()
+                || command.bidderId() == null
+                || command.bidderId() <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
+        }
+
+        if (command.amount() == null || command.amount() <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_BID_AMOUNT);
+        }
+    }
+
     private void validateBid(Auction auction, PlaceBidCommand command) {
-        if (!auction.isLive()) {
+        LocalDateTime now = LocalDateTime.now();
+
+        if (auction.getStartsAt() != null && now.isBefore(auction.getStartsAt())) {
+            throw new BusinessException(ErrorCode.AUCTION_NOT_STARTED);
+        }
+
+        if (auction.getEndsAt() == null) {
+            throw new BusinessException(ErrorCode.DATA_INTEGRITY_ERROR);
+        }
+
+        if (!auction.isLive() || !now.isBefore(auction.getEndsAt())) {
             throw new BusinessException(ErrorCode.AUCTION_ALREADY_ENDED);
         }
 

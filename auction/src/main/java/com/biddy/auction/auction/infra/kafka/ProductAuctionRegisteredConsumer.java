@@ -49,6 +49,7 @@ public class ProductAuctionRegisteredConsumer {
             auctionService.createFromProduct(payload);
         } catch (Exception e) {
             log.error("경매 상품 등록 이벤트 처리 실패: {}", message, e);
+            throw new IllegalArgumentException("잘못된 경매 상품 등록 이벤트입니다.", e);
         }
     }
 }

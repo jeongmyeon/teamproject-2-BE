@@ -9,6 +9,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -18,6 +19,7 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -77,5 +79,46 @@ class BidControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isEmpty())
                 .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    @DisplayName("POST 입찰에서 인증 헤더가 없으면 401 E002")
+    void placeBid_missingMemberHeader_returnsUnauthorized() throws Exception {
+        mockMvc.perform(post("/api/v1/auctions/A-001/bids")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"amount\":520000}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("E002"));
+    }
+
+    @Test
+    @DisplayName("POST 입찰 금액이 null이면 400 B005")
+    void placeBid_nullAmount_returnsInvalidBidAmount() throws Exception {
+        mockMvc.perform(post("/api/v1/auctions/A-001/bids")
+                        .header("X-Member-Id", "42")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"amount\":null}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("B005"));
+    }
+
+    @Test
+    @DisplayName("POST 입찰 JSON이 잘못되면 400 E001")
+    void placeBid_malformedJson_returnsInvalidInput() throws Exception {
+        mockMvc.perform(post("/api/v1/auctions/A-001/bids")
+                        .header("X-Member-Id", "42")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"amount\":"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("E001"));
+    }
+
+    @Test
+    @DisplayName("GET 입찰 내역의 음수 페이지는 400 E001")
+    void getBidHistory_negativePage_returnsInvalidInput() throws Exception {
+        mockMvc.perform(get("/api/v1/auctions/A-001/bids")
+                        .param("page", "-1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("E001"));
     }
 }
