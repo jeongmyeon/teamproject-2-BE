@@ -139,8 +139,6 @@ public class AuctionService implements AuctionUseCase {
     @Transactional
     public void createFromProduct(ProductAuctionRegisteredPayload payload) {
         String auctionId = generateAuctionId();
-        long startPrice = payload.startPrice().longValueExact();
-        long minIncrement = payload.minIncrement().longValue();
 
         if (auctionRepository.existsById(auctionId)) {
             log.warn("경매 이미 존재: auctionId={}", auctionId);
@@ -151,9 +149,9 @@ public class AuctionService implements AuctionUseCase {
                 .auctionId(auctionId)
                 .productId(payload.productId())
                 .sellerId(payload.sellerId())
-                .startPrice(startPrice)
-                .currentBid(startPrice)
-                .minIncrement(minIncrement)
+                .startPrice(payload.startPrice())
+                .currentBid(payload.startPrice())
+                .minIncrement(payload.minIncrement())
                 .startsAt(payload.startsAt())
                 .endsAt(payload.endsAt())
                 .build();
