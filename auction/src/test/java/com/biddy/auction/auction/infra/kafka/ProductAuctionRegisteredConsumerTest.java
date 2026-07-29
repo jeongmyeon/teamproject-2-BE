@@ -8,8 +8,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
@@ -41,8 +39,8 @@ class ProductAuctionRegisteredConsumerTest {
         consumer.consume(message);
 
         verify(auctionService).createFromProduct(captor.capture());
-        assertThat(captor.getValue().startPrice()).isEqualByComparingTo(new BigDecimal("5000.00"));
-        assertThat(captor.getValue().minIncrement()).isEqualTo(500);
+        assertThat(captor.getValue().startPrice()).isEqualTo(5000L);
+        assertThat(captor.getValue().minIncrement()).isEqualTo(500L);
     }
 
     @Test
