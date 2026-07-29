@@ -4,9 +4,7 @@ import com.biddy.auction.auction.domain.model.Auction;
 import com.biddy.auction.auction.domain.model.AuctionStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -35,10 +33,8 @@ public interface AuctionJpaRepository extends JpaRepository<Auction, String> {
             Pageable pageable
     );
 
-    /** 비관적 락으로 경매 조회 (SELECT ... FOR UPDATE) */
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT a FROM Auction a WHERE a.auctionId = :id")
-    Optional<Auction> findByIdForUpdate(@Param("id") String id);
+    // 비관적 락 메서드 제거 - 낙관적 락(@Version)으로 대체됨
+    // @Lock(LockModeType.PESSIMISTIC_WRITE) 사용하지 않음
 
     /** 종료 시각이 지난 LIVE 상태 경매 목록 조회 (스케줄러용) */
     List<Auction> findAllByStatusAndEndsAtBefore(AuctionStatus status, LocalDateTime now);

@@ -1,0 +1,32 @@
+spring:
+  cloud:
+    config:
+      enabled: false
+    discovery:
+      enabled: false
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_TEST_HOST:localhost}:${POSTGRES_TEST_PORT:5432}/${AUCTION_TEST_DB:biddy_auction}?currentSchema=auction_test
+    username: ${POSTGRES_TEST_USER:biddy}
+    password: ${POSTGRES_TEST_PASSWORD:biddy1234}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-init-sql: CREATE SCHEMA IF NOT EXISTS auction_test
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        default_schema: auction_test
+    open-in-view: false
+  kafka:
+    listener:
+      auto-startup: false
+  task:
+    scheduling:
+      enabled: false
+
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false

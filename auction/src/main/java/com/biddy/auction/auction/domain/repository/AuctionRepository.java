@@ -36,14 +36,8 @@ public interface AuctionRepository {
      */
     Optional<Auction> findById(String auctionId);
 
-    /**
-     * 비관적 락을 사용하여 경매를 조회한다 (SELECT ... FOR UPDATE).
-     * 동시 입찰 요청의 직렬화를 보장한다.
-     *
-     * @param auctionId 경매 ID
-     * @return 락이 걸린 경매 엔티티 (없으면 empty)
-     */
-    Optional<Auction> findByIdForUpdate(String auctionId);
+    // 비관적 락 메서드 제거 - 낙관적 락(@Version)으로 대체됨
+    // findByIdForUpdate 메서드는 더 이상 사용하지 않음
 
     /**
      * 경매를 저장한다.
@@ -52,6 +46,12 @@ public interface AuctionRepository {
      * @return 저장된 경매 엔티티
      */
     Auction save(Auction auction);
+
+    /**
+     * 현재 트랜잭션의 변경 사항을 DB에 즉시 반영한다.
+     * 낙관적 락 충돌을 성공 응답 전에 확정할 때 사용한다.
+     */
+    void flush();
 
     /**
      * 경매 ID 존재 여부를 확인한다 (멱등성 체크용).
