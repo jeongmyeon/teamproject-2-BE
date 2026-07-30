@@ -319,7 +319,9 @@ Smoke 판정: **PASS**. 같은 경매를 Smoke 이후 상태에서 이어서 2�
 | 낙관적 복구 커밋 | `9098a8e` |
 | 기준 `4492cbb` 대비 `auction/src` 차이 | 없음 |
 | 경매 모듈 전체 테스트 | 78개, 실패 0, 오류 0, PASS |
-| 복구 PR/AWS 배포 | 진행 전 |
+| 복구 PR | [#171](https://github.com/prgrms-be-adv-devcourse/beadv6_6_frontal_BE/pull/171), Ready, 충돌 없음 |
+| CI | 시작 대기 |
+| AWS 배포 | PR 머지 후 자동 배포 예정 |
 
 복구 확인:
 
