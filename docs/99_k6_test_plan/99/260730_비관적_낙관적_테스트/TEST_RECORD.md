@@ -181,6 +181,19 @@ AWS 비관적 락 테스트는 아직 실행하지 않았다. 공정한 비교�
 | 경매 모듈 전체 회귀 테스트 | 75개, 실패 0, 오류 0, PASS |
 | AWS 배포/Smoke/본 테스트 | 실행 전 |
 
+### 9.2 GitHub 배포 PR
+
+| 항목 | 값 |
+|---|---|
+| PR | `#170` `test(auction): 비관적 락 비교 테스트 배포` |
+| 대상 | `test/pessimistic-lock-260730` → `develop` |
+| 비관적 코드 커밋 | `737f115` |
+| 명세·기록 커밋 | `18131f4` |
+| PR 상태 | Draft, 병합 전 |
+| AWS 상태 | 비관적 variant 배포 전 |
+
+PR 병합 후 실제 배포 image SHA/digest와 Auction pod `3/3 Ready` 확인 결과를 이 절에 이어서 기록한다.
+
 1. 사용자 1이 동일한 시작가·최소 증가액·종료시간의 새 경매 2개 생성
 2. 비관적 락 배포 및 rollout 완료
 3. Auction replica Ready 3/3 확인
