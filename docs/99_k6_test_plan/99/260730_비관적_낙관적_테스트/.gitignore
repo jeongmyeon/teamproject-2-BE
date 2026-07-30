@@ -1,0 +1,5 @@
+credentials.local.json
+tokens.local.json
+test.local.env
+results/*
+!results/.gitignore

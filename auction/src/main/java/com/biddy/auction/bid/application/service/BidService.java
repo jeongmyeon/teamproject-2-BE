@@ -11,114 +11,44 @@ import com.biddy.auction.bid.application.dto.PlaceBidResult;
 import com.biddy.auction.bid.application.usecase.BidUseCase;
 import com.biddy.auction.bid.domain.model.Bid;
 import com.biddy.auction.bid.domain.repository.BidRepository;
-import com.biddy.auction.common.exception.BusinessException;
-import com.biddy.auction.common.exception.ErrorCode;
-import com.biddy.auction.common.metrics.OptimisticLockMetrics;
-import io.micrometer.core.instrument.Timer;
-import jakarta.persistence.OptimisticLockException;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
 import java.util.List;
 
 /**
- * 낙관적 락 기반 입찰 오케스트레이터.
+ * 비관적 락 기반 입찰 오케스트레이터.
  *
- * <p>이 빈은 트랜잭션을 열지 않는다. 각 재시도는 별도 빈인
- * {@link BidTransactionService}의 REQUIRES_NEW 트랜잭션에서 실행된다.</p>
+ * <p>실제 입찰은 {@link BidTransactionService}가 새 트랜잭션에서 경매 행의
+ * 비관적 쓰기 락을 획득한 뒤 처리한다.</p>
  */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class BidService implements BidUseCase {
-
-    private static final int MAX_ATTEMPTS = 3;
 
     private final BidRepository bidRepository;
     private final AuctionRepository auctionRepository;
     private final AuctionWebSocketPublisher webSocketPublisher;
-    private final OptimisticLockMetrics metrics;
     private final BidTransactionService bidTransactionService;
-    private final RetryTemplate optimisticLockRetryTemplate;
-
-    public BidService(
-            BidRepository bidRepository,
-            AuctionRepository auctionRepository,
-            AuctionWebSocketPublisher webSocketPublisher,
-            OptimisticLockMetrics metrics,
-            BidTransactionService bidTransactionService,
-            @Qualifier("optimisticLockRetryTemplate") RetryTemplate optimisticLockRetryTemplate
-    ) {
-        this.bidRepository = bidRepository;
-        this.auctionRepository = auctionRepository;
-        this.webSocketPublisher = webSocketPublisher;
-        this.metrics = metrics;
-        this.bidTransactionService = bidTransactionService;
-        this.optimisticLockRetryTemplate = optimisticLockRetryTemplate;
-    }
 
     /**
-     * 낙관적 락 충돌만 최대 3회 시도한다.
-     * 업무 규칙 위반은 즉시 전파하고 큐로 전환하지 않는다.
+     * 비관적 락 트랜잭션을 한 번 실행하고 커밋된 결과만 반환한다.
      */
     @Override
     public PlaceBidResult placeBid(PlaceBidCommand command) {
-        Timer.Sample sample = metrics.startBidProcessing();
-        long startedAt = System.nanoTime();
-        int[] attempts = {1};
+        PlaceBidResult result = bidTransactionService.executeBidTransaction(command);
+        publishCommittedBid(command, result);
 
-        try {
-            PlaceBidResult result = optimisticLockRetryTemplate.execute(context -> {
-                int attempt = context.getRetryCount() + 1;
-                attempts[0] = attempt;
-
-                if (attempt > 1) {
-                    metrics.recordRetryAttempt(command.auctionId(), attempt);
-                }
-
-                try {
-                    return bidTransactionService.executeBidTransaction(command);
-                } catch (OptimisticLockingFailureException | OptimisticLockException exception) {
-                    metrics.recordOptimisticLockConflict(command.auctionId());
-                    log.warn("낙관적 락 충돌 - 경매: {}, 시도: {}/{}",
-                            command.auctionId(), attempt, MAX_ATTEMPTS);
-                    throw exception;
-                }
-            });
-
-            if (attempts[0] > 1) {
-                metrics.recordRetrySuccess(
-                        command.auctionId(),
-                        attempts[0],
-                        Duration.ofNanos(System.nanoTime() - startedAt)
-                );
-            }
-
-            publishCommittedBid(command, result);
-
-            log.info("입찰 커밋 성공 - 경매: {}, 입찰ID: {}, 금액: {}원, 시도: {}",
-                    command.auctionId(), result.bidId(), result.amount(), attempts[0]);
-            return result;
-        } catch (BusinessException exception) {
-            // 업무 예외는 재시도 또는 큐 전환 없이 원래 HTTP 상태로 응답한다.
-            throw exception;
-        } catch (OptimisticLockingFailureException | OptimisticLockException exception) {
-            metrics.recordRetryFailure(command.auctionId(), MAX_ATTEMPTS);
-            throw new BusinessException(
-                    ErrorCode.BID_CONCURRENT_MODIFICATION,
-                    "동시 입찰 충돌이 발생했습니다. 최신 가격을 확인한 후 다시 시도해주세요"
-            );
-        } finally {
-            metrics.recordBidProcessing(sample);
-        }
+        log.info("비관적 락 입찰 커밋 성공 - 경매: {}, 입찰ID: {}, 금액: {}원",
+                command.auctionId(), result.bidId(), result.amount());
+        return result;
     }
 
     /**
