@@ -29,10 +29,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * 낙관적 락 입찰 서비스 통합 테스트
+ * 비관적 락 입찰 서비스 통합 테스트
  *
  * 동시 입찰 시나리오를 시뮬레이션하여
- * 낙관적 락의 정확성과 성능을 검증합니다.
+ * 비관적 락의 정확성과 데이터 정합성을 검증합니다.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -42,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
     "spring.cloud.config.enabled=false",
     "eureka.client.enabled=false"
 })
-public class OptimisticLockBidServiceTest {
+public class PessimisticLockBidServiceTest {
 
     @Autowired
     private BidService bidService;
@@ -95,12 +95,12 @@ public class OptimisticLockBidServiceTest {
         Auction updatedAuction = auctionRepository.findById(testAuction.getAuctionId()).orElseThrow();
         assertThat(updatedAuction.getCurrentBid()).isEqualTo(11000L);
         assertThat(updatedAuction.getCurrentBidderId()).isEqualTo(2000L);
-        assertThat(updatedAuction.getVersion()).isEqualTo(1L);
+        assertThat(updatedAuction.getVersion()).isZero();
     }
 
     @Test
-    @DisplayName("동시 입찰 시 낙관적 락이 정확히 작동한다")
-    void testConcurrentBidsWithOptimisticLock() throws InterruptedException, ExecutionException {
+    @DisplayName("동시 입찰 시 비관적 락이 정확히 작동한다")
+    void testConcurrentBidsWithPessimisticLock() throws InterruptedException, ExecutionException {
         // Given
         int threadCount = 10;
         int bidsPerThread = 5;
@@ -328,8 +328,8 @@ public class OptimisticLockBidServiceTest {
         // 경매의 입찰 수와 일치
         assertThat(finalAuction.getBidCount()).isEqualTo(totalStats.successCount);
 
-        // 새 경매는 성공한 Auction UPDATE 수와 version이 일치
-        assertThat(finalAuction.getVersion()).isEqualTo((long) totalStats.successCount);
+        // 비관적 variant는 version 컬럼을 JPA 버전으로 사용하지 않는다.
+        assertThat(finalAuction.getVersion()).isZero();
 
         // 모든 입찰 금액이 고유함 (중복 없음)
         List<Long> amounts = allBids.stream()

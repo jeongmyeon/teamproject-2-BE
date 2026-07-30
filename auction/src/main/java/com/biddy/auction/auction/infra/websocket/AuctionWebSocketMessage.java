@@ -99,7 +99,7 @@ public record AuctionWebSocketMessage(
      *
      * [사용 시점]
      * - BidService에서 입찰 처리 성공 후
-     * - 낙관적 락 재시도 성공 후
+     * - 입찰 트랜잭션 커밋 성공 후
      * - 큐 시스템 처리 완료 후
      *
      * [클라이언트 처리]

@@ -18,10 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 /**
- * 한 번의 입찰 시도를 독립 트랜잭션으로 처리한다.
- *
- * <p>재시도 오케스트레이터와 트랜잭션 빈을 분리하여 매 재시도가 최신 Auction을
- * 다시 읽고 새로운 트랜잭션에서 실행되도록 한다.</p>
+ * 비관적 쓰기 락을 획득한 뒤 한 번의 입찰을 독립 트랜잭션으로 처리한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -32,8 +29,8 @@ public class BidTransactionService {
     private final AuctionRepository auctionRepository;
 
     /**
-     * 입찰 저장과 경매 갱신을 하나의 새 트랜잭션으로 실행한다.
-     * flush까지 완료해야 성공 결과를 반환하므로 버전 충돌이 응답 이후로 지연되지 않는다.
+     * 경매 행을 {@code SELECT ... FOR UPDATE}로 잠근 뒤 입찰 저장과 경매 갱신을
+     * 하나의 새 트랜잭션으로 실행한다.
      */
     @Transactional(
             propagation = Propagation.REQUIRES_NEW,
@@ -42,7 +39,7 @@ public class BidTransactionService {
     public PlaceBidResult executeBidTransaction(PlaceBidCommand command) {
         validateCommand(command);
 
-        Auction auction = auctionRepository.findById(command.auctionId())
+        Auction auction = auctionRepository.findByIdForUpdate(command.auctionId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.AUCTION_NOT_FOUND));
 
         validateBid(auction, command);
@@ -56,8 +53,8 @@ public class BidTransactionService {
         auction.applyBid(command.amount(), command.bidderId());
         auctionRepository.save(auction);
 
-        // Bid INSERT와 Auction version UPDATE를 함께 flush한다.
-        // 충돌 시 이 트랜잭션 전체가 롤백되어 고아 Bid가 남지 않는다.
+        // Bid INSERT와 Auction UPDATE를 함께 flush한다.
+        // 실패 시 이 트랜잭션 전체가 롤백되어 고아 Bid가 남지 않는다.
         auctionRepository.flush();
 
         log.debug("입찰 트랜잭션 flush 완료 - 경매: {}, 입찰ID: {}, 금액: {}원",
