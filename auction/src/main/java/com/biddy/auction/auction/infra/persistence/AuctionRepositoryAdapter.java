@@ -35,10 +35,7 @@ public class AuctionRepositoryAdapter implements AuctionRepository {
         return auctionJpaRepository.findById(auctionId);
     }
 
-    @Override
-    public Optional<Auction> findByIdForUpdate(String auctionId) {
-        return auctionJpaRepository.findByIdForUpdate(auctionId);
-    }
+    // 비관적 락 메서드 제거 - 낙관적 락(@Version)으로 대체됨
 
     @Override
     public Auction save(Auction auction) {

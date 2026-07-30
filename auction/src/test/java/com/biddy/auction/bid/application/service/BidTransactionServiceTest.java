@@ -17,6 +17,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -70,7 +71,7 @@ class BidTransactionServiceTest {
                 .amount(520000L)
                 .build();
 
-        given(auctionRepository.findByIdForUpdate("A-001")).willReturn(Optional.of(auction));
+        given(auctionRepository.findById("A-001")).willReturn(Optional.of(auction));
         given(bidRepository.save(any(Bid.class))).willReturn(savedBid);
         given(auctionRepository.save(auction)).willReturn(auction);
 
@@ -78,7 +79,6 @@ class BidTransactionServiceTest {
 
         assertThat(result).isEqualTo(new PlaceBidResult(101L, 520000L, 520000L, 6));
         InOrder order = inOrder(bidRepository, auctionRepository);
-        order.verify(auctionRepository).findByIdForUpdate("A-001");
         order.verify(bidRepository).save(any(Bid.class));
         order.verify(auctionRepository).save(auction);
         order.verify(auctionRepository).flush();
@@ -88,7 +88,7 @@ class BidTransactionServiceTest {
     @DisplayName("업무 검증 실패 시 저장과 flush를 수행하지 않는다")
     void executeBidTransaction_validationFailure_doesNotWrite() {
         PlaceBidCommand command = new PlaceBidCommand("A-001", 42L, 509999L);
-        given(auctionRepository.findByIdForUpdate("A-001")).willReturn(Optional.of(auction));
+        given(auctionRepository.findById("A-001")).willReturn(Optional.of(auction));
 
         assertThatThrownBy(() -> transactionService.executeBidTransaction(command))
                 .isInstanceOf(BusinessException.class)
@@ -110,7 +110,7 @@ class BidTransactionServiceTest {
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.INVALID_BID_AMOUNT);
 
-        verify(auctionRepository, never()).findByIdForUpdate(any());
+        verify(auctionRepository, never()).findById(any());
         verify(bidRepository, never()).save(any());
     }
 
@@ -129,7 +129,7 @@ class BidTransactionServiceTest {
                 .startsAt(LocalDateTime.now().plusHours(1))
                 .endsAt(LocalDateTime.now().plusHours(2))
                 .build();
-        given(auctionRepository.findByIdForUpdate("A-001")).willReturn(Optional.of(scheduledAuction));
+        given(auctionRepository.findById("A-001")).willReturn(Optional.of(scheduledAuction));
 
         assertThatThrownBy(() -> transactionService.executeBidTransaction(
                 new PlaceBidCommand("A-001", 42L, 520000L)))
@@ -155,7 +155,7 @@ class BidTransactionServiceTest {
                 .startsAt(LocalDateTime.now().minusHours(2))
                 .endsAt(LocalDateTime.now().minusHours(1))
                 .build();
-        given(auctionRepository.findByIdForUpdate("A-001")).willReturn(Optional.of(expiredAuction));
+        given(auctionRepository.findById("A-001")).willReturn(Optional.of(expiredAuction));
 
         assertThatThrownBy(() -> transactionService.executeBidTransaction(
                 new PlaceBidCommand("A-001", 42L, 520000L)))
@@ -166,4 +166,25 @@ class BidTransactionServiceTest {
         verify(bidRepository, never()).save(any());
     }
 
+    @Test
+    @DisplayName("flush에서 발생한 버전 충돌을 오케스트레이터로 전파한다")
+    void executeBidTransaction_flushConflict_propagates() {
+        PlaceBidCommand command = new PlaceBidCommand("A-001", 42L, 520000L);
+        Bid savedBid = Bid.builder()
+                .bidId(101L)
+                .auctionId("A-001")
+                .bidderId(42L)
+                .amount(520000L)
+                .build();
+        ObjectOptimisticLockingFailureException conflict =
+                new ObjectOptimisticLockingFailureException(Auction.class, "A-001");
+
+        given(auctionRepository.findById("A-001")).willReturn(Optional.of(auction));
+        given(bidRepository.save(any(Bid.class))).willReturn(savedBid);
+        given(auctionRepository.save(auction)).willReturn(auction);
+        org.mockito.BDDMockito.willThrow(conflict).given(auctionRepository).flush();
+
+        assertThatThrownBy(() -> transactionService.executeBidTransaction(command))
+                .isSameAs(conflict);
+    }
 }
