@@ -59,6 +59,11 @@ spring:
           predicates:
             - Path=/api/auctions/**, /api/v1/auctions/**, /api/v1/members/me/watches/**, /api/v1/members/me/bids/**
 
+        - id: auction-service-websocket
+          uri: lb:ws://AUCTION-SERVICE
+          predicates:
+            - Path=/api/ws/**
+
         - id: payment-service
           uri: lb://PAYMENT-SERVICE
           predicates:
