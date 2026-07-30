@@ -93,12 +93,14 @@ public class Auction extends BaseEntity {
     @Column(name = "winning_bid_id")
     private Long winningBidId;
 
-    // -- 락 A/B 테스트 호환 컬럼 --
+    // -- 낙관적 락 지원 --
 
     /**
-     * 낙관적 락 복구 시 다시 {@code @Version}으로 사용할 컬럼.
-     * 비관적 락 variant에서는 일반 컬럼으로 매핑해 이중 락을 방지한다.
+     * JPA 낙관적 락 버전 필드
+     * 동시 수정 시 OptimisticLockException 발생
+     * UPDATE 시 자동으로 WHERE version = ? 조건 추가
      */
+    @Version
     @Column(name = "version", nullable = false)
     @Builder.Default
     private Long version = 0L;

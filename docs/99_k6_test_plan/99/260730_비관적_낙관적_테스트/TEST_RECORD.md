@@ -189,10 +189,31 @@ AWS 비관적 락 테스트는 아직 실행하지 않았다. 공정한 비교�
 | 대상 | `test/pessimistic-lock-260730` → `develop` |
 | 비관적 코드 커밋 | `737f115` |
 | 명세·기록 커밋 | `18131f4` |
-| PR 상태 | Draft, 병합 전 |
-| AWS 상태 | 비관적 variant 배포 전 |
+| PR 상태 | 2026-07-30 16:48 KST 병합 완료 |
+| develop merge SHA | `ebe2f357abf7a93543e684a0dc4bbdd0b9aa02bb` |
+| CI - Auction | 성공 |
+| Deploy to Kubernetes | 2026-07-30 16:51 KST 성공 |
+| Auction rollout | 성공, 단 배포 로그 기준 replica 1개 |
+| AWS 테스트 | replica 3개 준비 전이므로 미실행 |
 
-PR 병합 후 실제 배포 image SHA/digest와 Auction pod `3/3 Ready` 확인 결과를 이 절에 이어서 기록한다.
+배포 워크플로는 `origin/develop`을 `4492cbb`에서 `ebe2f357`로 fast-forward한 뒤 `deployment/auction`을 restart했고, rollout 성공을 확인했다. 그러나 저장소 `k8s/base/auction/deployment.yaml`의 `replicas`가 1이며 로그도 `1`개 replica rollout만 확인했다. 명세의 `3/3 Ready` 조건을 맞추기 전에는 AWS 부하 테스트를 실행하지 않는다.
+
+### 9.3 Auction replica 3개 준비
+
+2026-07-30 사용자가 AWS master에서 Auction deployment를 3개로 scale하고 rollout 성공을 확인했다.
+
+| Pod | Ready | Restart | Node |
+|---|---|---:|---|
+| `auction-554597f44-92ff8` | 1/1 | 0 | `biddy-master` |
+| `auction-554597f44-9bshk` | 1/1 | 0 | `biddy-worker` |
+| `auction-554597f44-t62lw` | 1/1 | 0 | `biddy-worker` |
+
+판정: Auction `3/3 Ready`, restart 0, master 1개·worker 2개 분산 — **PASS**.
+
+다음 조건은 아직 준비 전이다.
+
+- 비관적 테스트용 신규 경매 A/B
+- 사용자 2·3의 로컬 자격 파일
 
 1. 사용자 1이 동일한 시작가·최소 증가액·종료시간의 새 경매 2개 생성
 2. 비관적 락 배포 및 rollout 완료
@@ -202,6 +223,48 @@ PR 병합 후 실제 배포 image SHA/digest와 Auction pod `3/3 Ready` 확인 �
 6. 입찰자 계정 파일을 다시 만들고 15초 Smoke 실행
 7. Smoke 통과 후 같은 토큰으로 2분 본 테스트 실행
 8. 아래 비교표와 서버 지표 작성
+
+### 9.4 비관적 락 15초 Smoke 결과
+
+실행 시각: 2026-07-30 17:07 KST
+
+실행 ID: `260730-pessimistic-smoke`
+
+| 측정값 | 결과 |
+|---|---:|
+| 입찰 시도 | 96 |
+| `2xx` 성공 | 48 |
+| 성공률 | 50.00% |
+| HTTP 409 | 0 |
+| HTTP 400/422 업무 거절 | 48 |
+| HTTP 429 | 0 |
+| 예상 밖 오류율 | 0.00% |
+| 상세 조회 오류 | 0 |
+| 중단 iteration | 0 |
+| checks | 192 PASS / 0 FAIL |
+| 입찰 평균 | 497.61 ms |
+| 입찰 p95 | 766.25 ms |
+| 입찰 p99 | 1,194.09 ms |
+| 입찰 최대 | 1,200.46 ms |
+| 상세 조회 p95 | 83.65 ms |
+
+정합성 확인:
+
+| 상품 | 최초 현재가 | 최초 bidCount | 성공 | 최종 현재가 | 최종 bidCount | 판정 |
+|---|---:|---:|---:|---:|---:|---|
+| A (`A-C65CB`) | 1,500원 | 0 | 24 | 13,500원 | 24 | 일치 |
+| B (`A-6547A`) | 3,000원 | 0 | 24 | 15,000원 | 24 | 일치 |
+
+두 상품 모두 `최종 currentBid = 최초 currentBid + 성공 수 × 500원`이며 `bidCount 증가량 = k6 성공 수`다. 예상 밖 오류와 409가 없고 p95 2초 임계값을 통과했다.
+
+Smoke 판정: **PASS**. 같은 경매를 Smoke 이후 상태에서 이어서 2분 본 테스트에 사용할 수 있다.
+
+보안 정리:
+
+- 사용자 2·3 서버 로그아웃 HTTP 200
+- `credentials.local.json` 삭제 확인
+- `tokens.local.json` 삭제 확인
+- 원본: `results/260730-pessimistic-smoke-summary.json` (Git 제외)
 
 ## 10. 최종 비교표
 
@@ -230,3 +293,42 @@ PR 병합 후 실제 배포 image SHA/digest와 Auction pod `3/3 Ready` 확인 �
 - `OPTIMISTIC_RESULT_260730.md`
 
 최종 결론은 비관적 락을 동일 조건으로 실행한 후 작성한다.
+
+## 12. 두 락 중간 평가
+
+동일한 15초 Smoke 결과의 수치 비교, 방식별 장단점과 현재 선택 제안은 `LOCK_EVALUATION_260730.md`에 정리했다.
+
+중간 결론:
+
+- 두 락 모두 Smoke 정합성·안정성 PASS
+- 낙관적 락의 평균·p95가 비관적 락보다 약 13~14% 낮음
+- 비관적 락의 완료 흐름 수는 2.9% 많고 p99는 1.6% 낮아 tail 차이는 미미
+- 1회 Smoke만으로 성능 우열 확정 불가
+- 일반적인 분산 경매 운영 기본값은 낙관적 락 유지 제안
+- 비관적 2분 본 테스트 및 DB/서버 지표 확인 후 최종 평가 갱신 필요
+
+## 13. 낙관적 락 복구
+
+2026-07-30 사용자의 결정에 따라 비관적 2분 본 테스트는 실행하지 않고 Smoke 결과까지만 보존한 뒤 낙관적 락으로 복구한다.
+
+| 항목 | 값 |
+|---|---|
+| 복구 기준 develop | `ebe2f357abf7a93543e684a0dc4bbdd0b9aa02bb` |
+| 복구 브랜치 | `restore/optimistic-lock-260730` |
+| 역적용한 비관적 코드 커밋 | `737f115949caf735983ceab8e240874182a2ff74` |
+| 낙관적 복구 커밋 | `9098a8e` |
+| 기준 `4492cbb` 대비 `auction/src` 차이 | 없음 |
+| 경매 모듈 전체 테스트 | 78개, 실패 0, 오류 0, PASS |
+| 복구 PR | [#171](https://github.com/prgrms-be-adv-devcourse/beadv6_6_frontal_BE/pull/171), Ready, 충돌 없음 |
+| CI | Auction Build & Test 성공 (`d1f3c0a`), 이후 문서 전용 커밋은 경로 필터로 재실행 없음 |
+| AWS 배포 | PR 머지 후 자동 배포 예정 |
+
+복구 확인:
+
+- `Auction.version`의 JPA `@Version` 복구
+- 일반 `findById()` 기반 입찰 트랜잭션 복구
+- 낙관적 충돌 최대 3회 재시도 복구
+- 입찰 경로의 `PESSIMISTIC_WRITE` 제거
+- 낙관적 락 단위·통합 테스트 복구
+
+Smoke 원본 JSON은 Git 제외 상태로 로컬 `results/260730-pessimistic-smoke-summary.json`에 보존한다.
