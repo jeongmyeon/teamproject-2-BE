@@ -63,6 +63,8 @@ spring:
           uri: lb:ws://AUCTION-SERVICE
           predicates:
             - Path=/api/ws/**
+          filters:
+            - RewritePath=/api(?<segment>.*), $\{segment}
 
         - id: payment-service
           uri: lb://PAYMENT-SERVICE
