@@ -306,3 +306,27 @@ Smoke 판정: **PASS**. 같은 경매를 Smoke 이후 상태에서 이어서 2�
 - 1회 Smoke만으로 성능 우열 확정 불가
 - 일반적인 분산 경매 운영 기본값은 낙관적 락 유지 제안
 - 비관적 2분 본 테스트 및 DB/서버 지표 확인 후 최종 평가 갱신 필요
+
+## 13. 낙관적 락 복구
+
+2026-07-30 사용자의 결정에 따라 비관적 2분 본 테스트는 실행하지 않고 Smoke 결과까지만 보존한 뒤 낙관적 락으로 복구한다.
+
+| 항목 | 값 |
+|---|---|
+| 복구 기준 develop | `ebe2f357abf7a93543e684a0dc4bbdd0b9aa02bb` |
+| 복구 브랜치 | `restore/optimistic-lock-260730` |
+| 역적용한 비관적 코드 커밋 | `737f115949caf735983ceab8e240874182a2ff74` |
+| 낙관적 복구 커밋 | `9098a8e` |
+| 기준 `4492cbb` 대비 `auction/src` 차이 | 없음 |
+| 경매 모듈 전체 테스트 | 78개, 실패 0, 오류 0, PASS |
+| 복구 PR/AWS 배포 | 진행 전 |
+
+복구 확인:
+
+- `Auction.version`의 JPA `@Version` 복구
+- 일반 `findById()` 기반 입찰 트랜잭션 복구
+- 낙관적 충돌 최대 3회 재시도 복구
+- 입찰 경로의 `PESSIMISTIC_WRITE` 제거
+- 낙관적 락 단위·통합 테스트 복구
+
+Smoke 원본 JSON은 Git 제외 상태로 로컬 `results/260730-pessimistic-smoke-summary.json`에 보존한다.
