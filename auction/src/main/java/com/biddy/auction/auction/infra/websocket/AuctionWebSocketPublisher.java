@@ -1,5 +1,8 @@
 package com.biddy.auction.auction.infra.websocket;
 
+import com.biddy.auction.bid.config.BidRealtimeProperties;
+import com.biddy.auction.bid.infra.redis.BidRealtimeEvent;
+import com.biddy.auction.bid.infra.redis.BidRealtimeRedisPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -48,6 +51,8 @@ public class AuctionWebSocketPublisher {
      * 내부적으로 메시지 브로커와 연동하여 구독자에게 전달
      */
     private final SimpMessagingTemplate messagingTemplate;
+    private final BidRealtimeRedisPublisher redisPublisher;
+    private final BidRealtimeProperties realtimeProperties;
 
     /**
      * 입찰 발생 메시지 브로드캐스트
@@ -76,26 +81,28 @@ public class AuctionWebSocketPublisher {
      * @param bidderId   최고 입찰자 ID (현재 1등 표시)
      */
     public void publishBid(String auctionId, Long currentBid, Integer bidCount, Long bidderId) {
-        // BID 타입 메시지 생성
-        // 내부적으로 type 필드를 "BID"로 설정
-        AuctionWebSocketMessage message = AuctionWebSocketMessage.bid(currentBid, bidCount, bidderId);
+        if (realtimeProperties.getWebsocketSource() == BidRealtimeProperties.WebSocketSource.REDIS) {
+            try {
+                redisPublisher.publish(new BidRealtimeEvent(
+                        auctionId, currentBid, bidCount, bidderId
+                ));
+                return;
+            } catch (RuntimeException exception) {
+                log.error("Redis WebSocket fan-out 실패, 직접 발행으로 전환 - 경매: {}", auctionId, exception);
+            }
+        }
 
-        // STOMP 목적지 경로 생성
-        // 형식: /topic/auctions/AUCTION_ID_12345
-        String destination = "/topic/auctions/" + auctionId;
+        publishBidLocally(new BidRealtimeEvent(auctionId, currentBid, bidCount, bidderId));
+    }
 
-        // 메시지 전송 (비동기)
-        // SimpMessagingTemplate이 내부적으로 다음 처리:
-        // 1. 메시지를 JSON으로 변환 (Jackson 사용)
-        // 2. STOMP 프레임 생성
-        // 3. 구독자 목록 조회
-        // 4. 각 구독자의 WebSocket 세션으로 전송
+    public void publishBidLocally(BidRealtimeEvent event) {
+        AuctionWebSocketMessage message = AuctionWebSocketMessage.bid(
+                event.currentBid(), event.bidCount(), event.bidderId()
+        );
+        String destination = "/topic/auctions/" + event.auctionId();
         messagingTemplate.convertAndSend(destination, message);
-
-        // 디버그 로깅
-        // 운영 환경에서는 성능을 위해 DEBUG 레벨 비활성화 권장
         log.debug("WebSocket BID 메시지 발행 - 경매: {}, 현재가: {}원, 입찰수: {}",
-                auctionId, currentBid, bidCount);
+                event.auctionId(), event.currentBid(), event.bidCount());
     }
 
     /**
