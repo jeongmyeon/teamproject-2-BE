@@ -55,3 +55,7 @@ outbox:
     delay: ${OUTBOX_SCHEDULER_DELAY:5000}  # 스케줄러 실행 주기 (ms)
     max-retry-count: ${OUTBOX_MAX_RETRY_COUNT:5}  # 최대 재시도 횟수
     send-timeout-seconds: ${OUTBOX_SEND_TIMEOUT:10}  # Kafka 발행 타임아웃 (초)
+
+bid:
+  redis-projection-enabled: ${BID_REDIS_PROJECTION_ENABLED:false}
+  websocket-source: ${BID_WEBSOCKET_SOURCE:direct}
