@@ -4,6 +4,7 @@ import com.biddy.memberservice.domain.model.RefreshToken;
 import com.biddy.memberservice.domain.repository.RefreshTokenRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -20,14 +21,8 @@ public class RefreshTokenRepositoryImpl implements RefreshTokenRepository {
     }
 
     @Override
-    public Optional<RefreshToken> findByToken(String token) {
-        return jpaRepository.findByToken(token)
-                .map(RefreshTokenJpaEntity::toDomain);
-    }
-
-    @Override
-    public Optional<RefreshToken> findByMemberId(Long memberId) {
-        return jpaRepository.findByMemberId(memberId)
+    public Optional<RefreshToken> findByTokenHash(String tokenHash) {
+        return jpaRepository.findByTokenHash(tokenHash)
                 .map(RefreshTokenJpaEntity::toDomain);
     }
 
@@ -37,8 +32,9 @@ public class RefreshTokenRepositoryImpl implements RefreshTokenRepository {
     }
 
     @Override
-    public void delete(RefreshToken refreshToken) {
-        jpaRepository.deleteById(refreshToken.getId());
+    @Transactional
+    public void revokeAllByFamilyId(String familyId) {
+        jpaRepository.revokeAllByFamilyId(familyId);
     }
 
     @Override

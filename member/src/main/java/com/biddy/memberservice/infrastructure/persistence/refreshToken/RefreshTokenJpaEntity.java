@@ -27,8 +27,14 @@ public class RefreshTokenJpaEntity {
     @OnDelete(action = OnDeleteAction.CASCADE)
     private MemberJpaEntity member;
 
-    @Column(nullable = false, length = 255)
-    private String token;
+    @Column(name = "token_hash", nullable = false, length = 64)
+    private String tokenHash;
+
+    @Column(name = "family_id", nullable = false, length = 36)
+    private String familyId;
+
+    @Column(nullable = false)
+    private boolean revoked;
 
     @Column(nullable = false)
     private LocalDateTime expiredAt;
@@ -40,7 +46,9 @@ public class RefreshTokenJpaEntity {
         return RefreshToken.builder()
                 .id(this.id)
                 .member(this.member.toDomain())
-                .token(this.token)
+                .tokenHash(this.tokenHash)
+                .familyId(this.familyId)
+                .revoked(this.revoked)
                 .expiredAt(this.expiredAt)
                 .createdAt(this.createdAt)
                 .build();
@@ -50,7 +58,9 @@ public class RefreshTokenJpaEntity {
         RefreshTokenJpaEntity e = new RefreshTokenJpaEntity();
         e.id = rt.getId();
         e.member = MemberJpaEntity.from(rt.getMember());
-        e.token = rt.getToken();
+        e.tokenHash = rt.getTokenHash();
+        e.familyId = rt.getFamilyId();
+        e.revoked = rt.isRevoked();
         e.expiredAt = rt.getExpiredAt();
         e.createdAt = rt.getCreatedAt();
         return e;
