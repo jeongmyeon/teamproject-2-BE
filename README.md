@@ -187,7 +187,20 @@
 프로젝트 종료 후에도 위 "향후 개선점" 중 다음 두 가지는 개인 시간을 들여 직접 검증·구현해보고 있습니다. "동작은 한다"에서 멈추지 않고 근거를 남기는 것이 목표입니다.
 
 - **Refresh Token Rotation — 구현 완료.** 재발급마다 옛 토큰을 삭제 대신 `revoked` 처리로 남기는 family-id 기반 rotation을 도입해, 이미 사용된(탈취된) 토큰이 재사용되면 해당 계정의 모든 세션을 즉시 무효화하도록 구현했습니다. 토큰 저장도 원문 → SHA-256 해시로 전환했습니다. 단위 테스트 13개(정상 rotation, 재사용 감지·family 전체 무효화, 만료/미존재 토큰, 해시 유틸리티, 예외 매핑) 전부 통과 확인. 설계 문서: [`docs/superpowers/specs/2026-09-03-refresh-token-rotation-design.md`](./docs/superpowers/specs/2026-09-03-refresh-token-rotation-design.md) · 구현 계획: [`docs/superpowers/plans/2026-09-03-refresh-token-rotation.md`](./docs/superpowers/plans/2026-09-03-refresh-token-rotation.md)
-- **RAG 챗봇 검색 정확도(Top-K) 평가 도구 — 구현 완료, 실측은 예정.** knowledge 청크 자신의 질문을 정답지 삼아 Top-K별 검색 정확도(Recall@K)를 계산하는 기능을 추가했습니다(`/api/chatbot/admin/eval/retrieval-accuracy`). self-retrieval 기반이라 실제 사용자 질문보다 낙관적인 상한선 추정치이며, 실제 수치는 로컬 환경(Docker + GEMINI_API_KEY)에서 직접 실행해 확인할 계획입니다. 단위 테스트 11개(질문 추출, Top-K별 정확도 계산, 순위 조회, 파이프라인 조립) 전부 통과 확인. 설계 문서: [`docs/superpowers/specs/2026-09-04-rag-retrieval-accuracy-eval-design.md`](./docs/superpowers/specs/2026-09-04-rag-retrieval-accuracy-eval-design.md) · 구현 계획: [`docs/superpowers/plans/2026-09-04-rag-retrieval-accuracy-eval.md`](./docs/superpowers/plans/2026-09-04-rag-retrieval-accuracy-eval.md)
+- **RAG 챗봇 검색 정확도(Top-K) 평가 도구 — 구현 완료, 실측 완료.** knowledge 청크 자신의 질문을 정답지 삼아 Top-K별 검색 정확도(Recall@K)를 계산하는 기능을 추가했습니다(`/api/chatbot/admin/eval/retrieval-accuracy`). 단위 테스트 11개(질문 추출, Top-K별 정확도 계산, 순위 조회, 파이프라인 조립) 전부 통과, 로컬 Docker + 실제 Gemini API 환경에서 직접 실행까지 마쳤습니다.
+
+  **실측 결과** (29개 FAQ 질문, self-retrieval 기준):
+
+  | K | 정답 개수 | 정확도 |
+  | --- | --- | --- |
+  | 1 | 29 / 29 | 100% |
+  | 2 | 29 / 29 | 100% |
+  | 4 | 29 / 29 | 100% |
+  | 8 | 29 / 29 | 100% |
+
+  **해석**: K=1에서도 100%가 나온 건 "성능이 완벽하다"는 뜻이 아니라, **self-retrieval 방식 자체의 한계가 실측으로 드러난 것**입니다 — FAQ 문서가 만든 질문 그대로를 다시 물어보니 자기 청크와의 임베딩 유사도가 항상 가장 높게 나와, Top-K 값과 무관하게 만점이 나오는 구조입니다. 즉 이번 실측은 "검색 파이프라인(임베딩→pgvector 검색)이 실제로 정상 동작한다"는 것을 실제 환경에서 검증한 데 의의가 있고, "Top-4 설정이 적절한가"를 판단하려면 실제 사용자가 다르게 표현한(paraphrased) 질문 기반의 다음 단계 평가가 필요하다는 것도 이번 실측을 통해 명확해졌습니다.
+
+  설계 문서: [`docs/superpowers/specs/2026-09-04-rag-retrieval-accuracy-eval-design.md`](./docs/superpowers/specs/2026-09-04-rag-retrieval-accuracy-eval-design.md) · 구현 계획: [`docs/superpowers/plans/2026-09-04-rag-retrieval-accuracy-eval.md`](./docs/superpowers/plans/2026-09-04-rag-retrieval-accuracy-eval.md)
 
 ## 실행 방법
 
