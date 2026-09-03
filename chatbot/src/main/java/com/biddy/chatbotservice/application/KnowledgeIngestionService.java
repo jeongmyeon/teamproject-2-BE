@@ -59,7 +59,7 @@ public class KnowledgeIngestionService {
         reingestAll();
     }
 
-    private List<DocumentChunk> loadChunks() {
+    List<DocumentChunk> loadChunks() {
         List<DocumentChunk> result = new ArrayList<>();
         try {
             Resource[] resources = new PathMatchingResourcePatternResolver()
