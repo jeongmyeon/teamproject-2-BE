@@ -113,6 +113,12 @@ public interface RefreshTokenRepository {
 5. `reissue()` 만료된 토큰 — `IllegalArgumentException("만료된 토큰입니다.")`
 6. `RefreshToken` 도메인 — `revoke()` 호출 후 `isRevoked()`가 true인지 (순수 도메인 유닛 테스트)
 
+## 구현 시 주의사항 (계획 수립 중 발견)
+
+`reissue()`는 `@Transactional` 메서드다. 재사용 감지 분기에서 `revokeAllByFamilyId(...)`를 호출한 뒤 `RefreshTokenReuseException`(unchecked)을 던지면, Spring 기본 규칙상 **해당 트랜잭션 전체가 롤백**되어 방금 실행한 family 무효화 자체가 취소된다. 이러면 정작 가장 중요한 "탈취 감지 시 세션 무효화"가 조용히 무효화되어버리는 심각한 결함이 된다.
+
+따라서 `reissue()`의 `@Transactional`에 `noRollbackFor = RefreshTokenReuseException.class`를 명시해, 이 예외가 발생해도 그 시점까지의 변경(family 전체 revoke)은 커밋되도록 해야 한다.
+
 ## 마이그레이션 참고
 
 - 기존에 DB에 남아있는 원문 refresh token row는 새 해시 조회 로직과 맞지 않는다. `ddl-auto: update`로 컬럼만 추가되고 기존 데이터는 그대로 남으므로, 서비스 재기동 시점 이후 로그인한 사용자부터 새 구조가 적용된다. 개인 프로젝트 규모(운영 데이터 없음)이므로 별도 데이터 마이그레이션 스크립트는 작성하지 않는다.
