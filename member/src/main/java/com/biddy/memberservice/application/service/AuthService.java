@@ -5,6 +5,7 @@ import com.biddy.memberservice.application.dto.request.SignupRequest;
 import com.biddy.memberservice.application.dto.response.TokenResponse;
 import com.biddy.memberservice.application.event.MemberEventPublisher;
 import com.biddy.memberservice.domain.enums.MemberStatus;
+import com.biddy.memberservice.domain.exception.RefreshTokenReuseException;
 import com.biddy.memberservice.domain.model.EmailVerification;
 import com.biddy.memberservice.domain.model.Member;
 import com.biddy.memberservice.domain.model.RefreshToken;
@@ -13,6 +14,7 @@ import com.biddy.memberservice.domain.repository.MemberRepository;
 import com.biddy.memberservice.domain.repository.RefreshTokenRepository;
 import com.biddy.memberservice.infrastructure.security.JwtBlacklistService;
 import com.biddy.memberservice.infrastructure.security.JwtTokenProvider;
+import com.biddy.memberservice.infrastructure.security.TokenHasher;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -38,6 +41,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JavaMailSender mailSender;
     private final MemberEventPublisher eventPublisher;
+    private final TokenHasher tokenHasher;
 
     @Transactional
     @SneakyThrows
@@ -88,32 +92,46 @@ public class AuthService {
         String refreshToken = jwtTokenProvider.generateRefreshToken(member.getId());
 
         refreshTokenRepository.deleteByMemberId(member.getId());
-        refreshTokenRepository.save(RefreshToken.create(
+        String familyId = UUID.randomUUID().toString();
+        refreshTokenRepository.save(RefreshToken.issue(
                 member,
-                refreshToken,
+                tokenHasher.hash(refreshToken),
+                familyId,
                 LocalDateTime.now().plusDays(7)
         ));
 
         return TokenResponse.of(accessToken, refreshToken);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = RefreshTokenReuseException.class)
     public TokenResponse reissue(String refreshToken) {
-        RefreshToken token = refreshTokenRepository.findByToken(refreshToken)
+        String tokenHash = tokenHasher.hash(refreshToken);
+        RefreshToken token = refreshTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 토큰입니다."));
+
+        if (token.isRevoked()) {
+            refreshTokenRepository.revokeAllByFamilyId(token.getFamilyId());
+            log.warn("refresh token 재사용 감지: memberId={}, familyId={}",
+                    token.getMember().getId(), token.getFamilyId());
+            throw new RefreshTokenReuseException(
+                    "비정상적인 토큰 재사용이 감지되어 모든 세션이 종료되었습니다. 다시 로그인해 주세요.");
+        }
 
         if (token.isExpired()) {
             throw new IllegalArgumentException("만료된 토큰입니다.");
         }
 
         Member member = token.getMember();
+        token.revoke();
+        refreshTokenRepository.save(token);
+
         String newAccessToken = jwtTokenProvider.generateAccessToken(member.getId(), member.getRole());
         String newRefreshToken = jwtTokenProvider.generateRefreshToken(member.getId());
 
-        refreshTokenRepository.delete(token);
-        refreshTokenRepository.save(RefreshToken.create(
+        refreshTokenRepository.save(RefreshToken.issue(
                 member,
-                newRefreshToken,
+                tokenHasher.hash(newRefreshToken),
+                token.getFamilyId(),
                 LocalDateTime.now().plusDays(7)
         ));
 
