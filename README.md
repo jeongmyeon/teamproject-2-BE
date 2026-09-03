@@ -186,7 +186,7 @@
 
 프로젝트 종료 후에도 위 "향후 개선점" 중 다음 두 가지는 개인 시간을 들여 직접 검증·구현해보고 있습니다. "동작은 한다"에서 멈추지 않고 근거를 남기는 것이 목표입니다.
 
-- **Refresh Token Rotation** — 설계 완료, 구현 진행 중. 현재는 재발급 시 옛 토큰을 즉시 삭제해 재사용 여부를 감지할 수 없는 구조인데, family-id 기반으로 rotation 이력을 남기고 재사용이 감지되면 해당 계정의 전체 세션을 무효화하도록 개선 중입니다. (토큰 저장도 원문 → SHA-256 해시로 함께 개선) 설계 문서: [`docs/superpowers/specs/2026-09-03-refresh-token-rotation-design.md`](./docs/superpowers/specs/2026-09-03-refresh-token-rotation-design.md)
+- **Refresh Token Rotation — 구현 완료.** 재발급마다 옛 토큰을 삭제 대신 `revoked` 처리로 남기는 family-id 기반 rotation을 도입해, 이미 사용된(탈취된) 토큰이 재사용되면 해당 계정의 모든 세션을 즉시 무효화하도록 구현했습니다. 토큰 저장도 원문 → SHA-256 해시로 전환했습니다. 단위 테스트 13개(정상 rotation, 재사용 감지·family 전체 무효화, 만료/미존재 토큰, 해시 유틸리티, 예외 매핑) 전부 통과 확인. 설계 문서: [`docs/superpowers/specs/2026-09-03-refresh-token-rotation-design.md`](./docs/superpowers/specs/2026-09-03-refresh-token-rotation-design.md) · 구현 계획: [`docs/superpowers/plans/2026-09-03-refresh-token-rotation.md`](./docs/superpowers/plans/2026-09-03-refresh-token-rotation.md)
 - **RAG 챗봇 환각률 정량 검증** — 예정. FAQ 기반 평가 질의셋을 구축해 Top-K 값별 정답률·환각률을 수치로 측정할 계획입니다.
 
 ## 실행 방법
