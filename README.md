@@ -202,6 +202,8 @@
 
   설계 문서: [`docs/superpowers/specs/2026-09-04-rag-retrieval-accuracy-eval-design.md`](./docs/superpowers/specs/2026-09-04-rag-retrieval-accuracy-eval-design.md) · 구현 계획: [`docs/superpowers/plans/2026-09-04-rag-retrieval-accuracy-eval.md`](./docs/superpowers/plans/2026-09-04-rag-retrieval-accuracy-eval.md)
 
+- **Paraphrase 기반 검색 정확도 평가 — 구현 완료, 실측은 예정.** self-retrieval 평가의 한계(자기 질문 그대로라 낙관적인 상한선)를 보완하기 위해, FAQ 원본 질문을 Gemini로 자연스럽게 paraphrase(질문당 2개, 기본값)한 뒤 같은 검색 파이프라인으로 Top-K별 정확도를 재는 기능을 추가했습니다(`/api/chatbot/admin/eval/retrieval-accuracy-paraphrased`). 기존 컴포넌트(`EvalQuestionExtractor`, `RetrievalRankFinder`, `RetrievalAccuracyCalculator`)를 그대로 재사용하고 `ParaphraseGenerator`만 새로 추가하는 구조로 설계했습니다. 단위 테스트 9개(응답 파싱, paraphrase→평가질문 변환, 파이프라인 조립) 전부 통과 확인. 실제 수치는 로컬 환경에서 직접 실행해 self-retrieval 결과(K=1~8 전부 100%)와 비교할 계획입니다. 설계 문서: [`docs/superpowers/specs/2026-10-01-paraphrased-retrieval-eval-design.md`](./docs/superpowers/specs/2026-10-01-paraphrased-retrieval-eval-design.md) · 구현 계획: [`docs/superpowers/plans/2026-10-01-paraphrased-retrieval-eval.md`](./docs/superpowers/plans/2026-10-01-paraphrased-retrieval-eval.md)
+
 ## 실행 방법
 
 ```bash
