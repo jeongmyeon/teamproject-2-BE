@@ -2,6 +2,7 @@ package com.biddy.chatbotservice.presentation.controller;
 
 import com.biddy.chatbotservice.application.ChatbotQueryService;
 import com.biddy.chatbotservice.application.KnowledgeIngestionService;
+import com.biddy.chatbotservice.application.ParaphrasedRetrievalAccuracyEvalService;
 import com.biddy.chatbotservice.application.RetrievalAccuracyEvalService;
 import com.biddy.chatbotservice.presentation.dto.ChatbotQueryRequest;
 import com.biddy.chatbotservice.presentation.dto.ChatbotQueryResponse;
@@ -28,6 +29,7 @@ public class ChatbotController {
     private final ChatbotQueryService chatbotQueryService;
     private final KnowledgeIngestionService knowledgeIngestionService;
     private final RetrievalAccuracyEvalService retrievalAccuracyEvalService;
+    private final ParaphrasedRetrievalAccuracyEvalService paraphrasedRetrievalAccuracyEvalService;
 
     @Operation(summary = "챗봇에게 질문", description = "FAQ/정책 문서를 검색해 Gemini 2.5 Flash-Lite가 답변을 생성한다.")
     @PostMapping("/query")
@@ -51,5 +53,17 @@ public class ChatbotController {
     public RetrievalAccuracyReport evaluateRetrievalAccuracy(
             @RequestParam(defaultValue = "1,2,4,8") List<Integer> topKs) {
         return retrievalAccuracyEvalService.evaluate(topKs);
+    }
+
+    @Operation(
+            summary = "Paraphrase 기반 검색 정확도 평가",
+            description = "FAQ 원본 질문을 Gemini로 paraphrase(다르게 표현)한 뒤, 그 질문들로 Top-K별 검색 정확도를 측정한다. " +
+                    "self-retrieval 평가보다 실제 사용자 질문에 가까운 더 엄격한 기준이다."
+    )
+    @PostMapping("/admin/eval/retrieval-accuracy-paraphrased")
+    public RetrievalAccuracyReport evaluateParaphrasedRetrievalAccuracy(
+            @RequestParam(defaultValue = "1,2,4,8") List<Integer> topKs,
+            @RequestParam(defaultValue = "2") int paraphrasesPerQuestion) {
+        return paraphrasedRetrievalAccuracyEvalService.evaluate(topKs, paraphrasesPerQuestion);
     }
 }
